@@ -1,0 +1,219 @@
+.results-section {
+  padding: 80px 24px;
+}
+
+.results-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 40px;
+}
+
+.results-header h2 {
+  font-size: 2rem;
+}
+
+.results-grid {
+  display: grid;
+  grid-template-columns: 350px 1fr;
+  gap: 24px;
+}
+
+/* Summary Card */
+.result-summary {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  gap: 32px;
+  background: var(--bg-tertiary);
+}
+
+.score-container {
+  padding: 16px 0;
+}
+
+.status-container {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+.status-title {
+  font-size: 1.25rem;
+  margin: 16px 0 8px;
+}
+
+.status-summary {
+  color: var(--text-secondary);
+  font-size: 0.9rem;
+  line-height: 1.5;
+}
+
+/* Details Card */
+.result-details {
+  display: flex;
+  flex-direction: column;
+}
+
+.details-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  margin-bottom: 24px;
+  padding-bottom: 16px;
+  border-bottom: 1px solid var(--border-light);
+}
+
+.details-header h3 {
+  font-size: 1.25rem;
+  margin: 0;
+}
+
+.content-badge {
+  background: var(--bg-elevated);
+  padding: 4px 12px;
+  border-radius: 999px;
+  font-size: 0.75rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  color: var(--text-secondary);
+  border: 1px solid var(--border-light);
+}
+
+.explanation-text {
+  flex: 1;
+  font-size: 0.95rem;
+  line-height: 1.6;
+  color: #d4d4d8; /* Zinc 300 */
+}
+
+.explanation-text p {
+  margin-bottom: 12px;
+}
+
+.explanation-text p.spacer {
+  margin-bottom: 24px;
+}
+
+/* Finding items styling for better readability */
+.finding-item {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  padding: 12px 16px;
+  background: rgba(255,255,255,0.02);
+  border-radius: 8px;
+  border: 1px solid rgba(255,255,255,0.05);
+  margin-bottom: 12px;
+}
+
+.finding-icon {
+  font-size: 1.25rem;
+  line-height: 1;
+}
+
+.finding-content {
+  flex: 1;
+}
+
+.finding-content strong {
+  display: block;
+  color: var(--text-primary);
+  font-size: 0.85rem;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  margin-bottom: 4px;
+}
+
+.metadata-footer {
+  margin-top: 32px;
+  padding-top: 16px;
+  border-top: 1px dashed var(--border-light);
+  display: flex;
+  justify-content: flex-end;
+  font-size: 0.8rem;
+  color: var(--text-muted);
+}
+
+/* Gauge Styles */
+.gauge-container {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  filter: drop-shadow(0 10px 20px rgba(0,0,0,0.5));
+}
+
+.gauge-bg {
+  stroke: rgba(255, 255, 255, 0.05);
+}
+
+.gauge-success { stroke: var(--status-success); filter: drop-shadow(0 0 10px rgba(16,185,129,0.3)); }
+.gauge-warning { stroke: var(--status-warning); filter: drop-shadow(0 0 10px rgba(245,158,11,0.3)); }
+.gauge-danger { stroke: var(--status-danger); filter: drop-shadow(0 0 10px rgba(239,68,68,0.3)); }
+
+.gauge-text {
+  position: absolute;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+.gauge-value {
+  font-size: 2.5rem;
+  font-weight: 800;
+  line-height: 1;
+  letter-spacing: -0.05em;
+}
+
+.gauge-label {
+  font-size: 0.75rem;
+  color: var(--text-secondary);
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  margin-top: 4px;
+}
+
+/* Risk Badge Styles */
+.risk-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 14px;
+  border-radius: 999px;
+  font-weight: 600;
+  font-size: 0.85rem;
+  letter-spacing: 0.02em;
+}
+
+.risk-low {
+  background: rgba(16, 185, 129, 0.15);
+  color: var(--status-success);
+  border: 1px solid rgba(16, 185, 129, 0.3);
+}
+
+.risk-medium {
+  background: rgba(245, 158, 11, 0.15);
+  color: var(--status-warning);
+  border: 1px solid rgba(245, 158, 11, 0.3);
+}
+
+.risk-high {
+  background: rgba(239, 68, 68, 0.15);
+  color: #fca5a5;
+  border: 1px solid rgba(239, 68, 68, 0.3);
+}
+
+.risk-critical {
+  background: var(--status-danger);
+  color: #ffffff;
+  border: 1px solid var(--status-danger);
+  box-shadow: 0 0 20px rgba(239, 68, 68, 0.4);
+}
+
+@media (max-width: 900px) {
+  .results-grid {
+    grid-template-columns: 1fr;
+  }
+}
