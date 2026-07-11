@@ -19,6 +19,13 @@ class ContentType(str, Enum):
     SCREENSHOT = "screenshot"
 
 
+class DetailedMetric(BaseModel):
+    """Detailed forensic metric for advanced reporting."""
+    name: str
+    score: float
+    description: str
+
+
 class AnalysisDetail(BaseModel):
     """Individual finding from an analyzer."""
     category: str
@@ -45,6 +52,8 @@ class AnalysisResult(BaseModel):
     is_authentic: bool
     summary: str
     explanation: str
+    analysis_summary: Optional[str] = None
+    detailed_breakdown: Optional[List[DetailedMetric]] = None
     details: List[AnalysisDetail]
     # Video-specific
     total_frames: Optional[int] = None

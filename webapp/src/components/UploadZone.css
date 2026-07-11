@@ -1,5 +1,5 @@
 .upload-section {
-  padding: 80px 0;
+  padding: 40px 0;
 }
 
 .upload-container {
@@ -176,4 +176,35 @@
   display: flex;
   justify-content: flex-end;
   margin-top: 24px;
+}
+
+/* Example Picker styles for demo buttons */
+.example-picker-wrapper {
+  background: var(--bg-primary);
+  border-top: 1px solid var(--border-light);
+  border-radius: 0 0 19.2px 19.2px;
+  padding: 24px 40px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.example-label {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--text-secondary);
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+}
+
+.example-buttons {
+  display: flex;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.btn-small {
+  padding: 8px 16px !important;
+  font-size: 10px !important;
+  height: auto !important;
 }

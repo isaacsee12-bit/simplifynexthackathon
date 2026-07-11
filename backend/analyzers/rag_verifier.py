@@ -6,10 +6,11 @@ from typing import List, Tuple
 from models.schemas import AnalysisDetail, RiskLevel
 from core.groq_client import groq_client
 
+
 class RAGVerifier:
     """
     RAG-backed claim verification engine.
-    Uses Wikipedia for context, and Groq LLM to verify claims against the context.
+    Uses Wikipedia + DuckDuckGo for context, and Groq LLM (70B) to verify claims.
     """
 
     CLAIM_PATTERNS = [
@@ -19,6 +20,9 @@ class RAGVerifier:
         r'(?:scientists?\s+(?:say|confirm|discover))\s+(?:that\s+)?(.+?)(?:\.|$)',
         r'(?:research\s+(?:shows|proves|indicates))\s+(?:that\s+)?(.+?)(?:\.|$)',
         r'(?:experts?\s+(?:say|warn|confirm))\s+(?:that\s+)?(.+?)(?:\.|$)',
+        r'(?:reports?\s+(?:show|indicate|suggest))\s+(?:that\s+)?(.+?)(?:\.|$)',
+        r'(?:data\s+(?:shows|proves|reveals))\s+(?:that\s+)?(.+?)(?:\.|$)',
+        r'(?:(?:new|recent)\s+(?:study|research|findings?))\s+(?:that\s+)?(.+?)(?:\.|$)',
     ]
 
     def verify_claims(self, text: str) -> Tuple[List[AnalysisDetail], dict]:
@@ -28,81 +32,93 @@ class RAGVerifier:
         claims_verified = 0
 
         extracted_claims = self._extract_claims(text)
-        
+
         for claim in extracted_claims:
             claims_found += 1
+
+            # Try Wikipedia first
             snippet = self._query_wikipedia(claim)
-            
+
+            # Fallback to DuckDuckGo if Wikipedia has no results
+            if not snippet:
+                snippet = self._query_duckduckgo(claim)
+
             if snippet and groq_client:
                 clean_snippet = re.sub(r'<[^>]+>', '', snippet)
-                
-                # Use Groq to evaluate the claim against the snippet
-                prompt = f"""
-You are a fact-checking assistant. Evaluate if the following claim is supported by the provided context.
+
+                prompt = f"""You are a fact-checking assistant. Evaluate if the following claim is supported, refuted, or uncertain based on the provided context.
 
 Claim: "{claim}"
-Context: "{clean_snippet}"
+Context: "{clean_snippet[:1000]}"
 
 Output JSON:
 {{
-    "supported": true | false,
-    "reasoning": "Brief explanation"
+    "verdict": "supported" | "refuted" | "uncertain",
+    "reasoning": "Brief, specific explanation citing evidence from context"
 }}
+
+Be rigorous: if the context doesn't directly address the claim, use "uncertain" not "supported".
 """
                 try:
                     response = groq_client.chat.completions.create(
                         messages=[{"role": "user", "content": prompt}],
-                        model="llama-3.1-8b-instant",
+                        model="llama-3.3-70b-versatile",
                         response_format={"type": "json_object"},
-                        temperature=0.0
+                        temperature=0.0,
+                        max_tokens=300,
                     )
                     result = json.loads(response.choices[0].message.content)
-                    is_supported = result.get("supported", False)
+                    verdict = result.get("verdict", "uncertain").lower()
                     reasoning = result.get("reasoning", "")
-                    
-                    if is_supported:
+
+                    if verdict == "supported":
                         claims_verified += 1
                         details.append(AnalysisDetail(
                             category="Live Web Verification",
-                            finding=f"Verified Claim: '{claim[:60]}...' | Reason: {reasoning}",
-                            confidence=0.9,
+                            finding=f"✓ Verified: '{claim[:60]}...' — {reasoning[:120]}",
+                            confidence=0.85,
                             severity=RiskLevel.LOW
                         ))
-                    else:
+                    elif verdict == "refuted":
                         claims_flagged += 1
                         details.append(AnalysisDetail(
                             category="Claim Verification",
-                            finding=f"Refuted/Unverified Claim: '{claim[:80]}...' | Context conflicts: {reasoning}",
+                            finding=f"✗ Refuted: '{claim[:80]}...' — {reasoning[:120]}",
                             confidence=0.8,
                             severity=RiskLevel.HIGH
                         ))
+                    else:
+                        details.append(AnalysisDetail(
+                            category="Claim Verification",
+                            finding=f"? Uncertain: '{claim[:80]}...' — {reasoning[:120]}",
+                            confidence=0.5,
+                            severity=RiskLevel.MEDIUM
+                        ))
                 except Exception as e:
                     print(f"Groq RAG evaluation error: {e}")
-                    # Fallback
                     claims_verified += 1
                     details.append(AnalysisDetail(
                         category="Live Web Verification",
-                        finding=f"Claim: '{claim[:60]}...' | Internet Context: '{clean_snippet[:120]}...'",
-                        confidence=0.85,
+                        finding=f"Claim: '{claim[:60]}...' | Context found: '{clean_snippet[:120]}...'",
+                        confidence=0.6,
                         severity=RiskLevel.LOW
                     ))
 
             elif snippet:
-                # Fallback if groq_client fails
                 clean_snippet = re.sub(r'<[^>]+>', '', snippet)
                 claims_verified += 1
                 details.append(AnalysisDetail(
                     category="Live Web Verification",
                     finding=f"Claim: '{claim[:60]}...' | Internet Context: '{clean_snippet[:120]}...'",
-                    confidence=0.85,
+                    confidence=0.6,
                     severity=RiskLevel.LOW
                 ))
             else:
                 claims_flagged += 1
                 details.append(AnalysisDetail(
                     category="Claim Verification",
-                    finding=f"Unverified claim detected: '{claim[:80]}...' — No matching internet consensus found.",
-                    confidence=0.6,
+                    finding=f"⚠ Unverifiable: '{claim[:80]}...' — No matching internet consensus found",
+                    confidence=0.55,
                     severity=RiskLevel.MEDIUM
                 ))
 
@@ -119,7 +135,7 @@ Output JSON:
         for pattern in self.CLAIM_PATTERNS:
             matches = re.findall(pattern, text, re.IGNORECASE)
             claims.extend(matches)
-        
+
         seen = set()
         unique_claims = []
         for claim in claims:
@@ -127,7 +143,7 @@ Output JSON:
             if claim_clean not in seen and len(claim_clean) > 10:
                 seen.add(claim_clean)
                 unique_claims.append(claim.strip())
-        return unique_claims[:3]  # Max 3 to reduce API calls
+        return unique_claims[:5]  # Up to 5 claims
 
     def _query_wikipedia(self, claim: str) -> str:
         """Query Wikipedia API live to find supporting context."""
@@ -137,15 +153,41 @@ Output JSON:
                 return None
             query = urllib.parse.quote(" ".join(words))
             url = f"https://en.wikipedia.org/w/api.php?action=query&list=search&srsearch={query}&utf8=&format=json&srlimit=1"
-            req = urllib.request.Request(url, headers={'User-Agent': 'TruthLens/1.0'})
-            
-            with urllib.request.urlopen(req, timeout=2.0) as response:
+            req = urllib.request.Request(url, headers={'User-Agent': 'TruthLens/2.0'})
+
+            with urllib.request.urlopen(req, timeout=3.0) as response:
                 data = json.loads(response.read().decode())
                 search_results = data.get('query', {}).get('search', [])
                 if search_results:
                     return search_results[0].get('snippet', '')
         except Exception as e:
-            print(f"Live web search failed: {e}")
+            print(f"Wikipedia search failed: {e}")
         return None
+
+    def _query_duckduckgo(self, claim: str) -> str:
+        """Fallback: query DuckDuckGo Instant Answer API for context."""
+        try:
+            words = [w for w in claim.split() if len(w) > 3][:6]
+            if not words:
+                return None
+            query = urllib.parse.quote(" ".join(words))
+            url = f"https://api.duckduckgo.com/?q={query}&format=json&no_redirect=1&no_html=1"
+            req = urllib.request.Request(url, headers={'User-Agent': 'TruthLens/2.0'})
+
+            with urllib.request.urlopen(req, timeout=3.0) as response:
+                data = json.loads(response.read().decode())
+                # Check Abstract, AbstractText, or RelatedTopics
+                abstract = data.get('AbstractText', '')
+                if abstract and len(abstract) > 30:
+                    return abstract
+
+                # Try related topics
+                related = data.get('RelatedTopics', [])
+                if related and isinstance(related[0], dict):
+                    return related[0].get('Text', '')
+        except Exception as e:
+            print(f"DuckDuckGo search failed: {e}")
+        return None
+
 
 rag_verifier = RAGVerifier()

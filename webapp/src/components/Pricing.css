@@ -1,0 +1,133 @@
+.pricing-section {
+  padding: 80px 40px;
+}
+
+.pricing-header {
+  text-align: center;
+  max-width: 800px;
+  margin: 0 auto 60px auto;
+}
+
+.pricing-header h2 {
+  font-size: 32px;
+  margin-bottom: 20px;
+}
+
+.pricing-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 32px;
+  max-width: 900px;
+  margin: 0 auto;
+}
+
+.pricing-card {
+  display: flex;
+  flex-direction: column;
+  padding: 40px;
+  gap: 20px;
+}
+
+.pricing-card.popular {
+  border-color: var(--accent-cyan);
+  box-shadow: 0 0 20px rgba(175, 80, 255, 0.1);
+}
+
+.card-badge {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  background: rgba(175, 80, 255, 0.1);
+  color: var(--accent-cyan);
+  align-self: flex-start;
+  padding: 4px 8px;
+  border-radius: 4px;
+  letter-spacing: 0.1em;
+}
+
+.plan-name {
+  font-family: var(--font-mono);
+  font-size: 12px;
+  letter-spacing: 0.15em;
+  color: var(--text-secondary);
+}
+
+.price-tag {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+}
+
+.price-tag .amount {
+  font-size: 48px;
+  font-weight: 700;
+  color: var(--text-primary);
+}
+
+.price-tag .period {
+  font-family: var(--font-mono);
+  font-size: 12px;
+  color: var(--text-secondary);
+}
+
+.plan-desc {
+  font-size: 14px;
+  color: var(--text-secondary);
+  line-height: 1.5;
+}
+
+.plan-features {
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  margin: 20px 0;
+  flex: 1;
+}
+
+.plan-features li {
+  font-size: 14px;
+  color: var(--text-primary);
+}
+
+.plan-btn {
+  width: 100%;
+}
+
+.billing-trust-card {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 40px;
+  max-width: 900px;
+  margin: 40px auto 0 auto;
+  padding: 30px 40px;
+}
+
+.trust-item {
+  display: flex;
+  gap: 16px;
+}
+
+.trust-icon {
+  font-size: 24px;
+}
+
+.trust-item h4 {
+  font-size: 14px;
+  margin-bottom: 4px;
+}
+
+.trust-item p {
+  color: var(--text-secondary);
+  font-size: 12px;
+  line-height: 1.5;
+}
+
+@media (max-width: 768px) {
+  .pricing-grid {
+    grid-template-columns: 1fr;
+  }
+  .billing-trust-card {
+    grid-template-columns: 1fr;
+    gap: 24px;
+  }
+}

@@ -1,7 +1,16 @@
-import React from 'react';
+import React, { useState } from 'react';
 import './Navbar.css';
 
-const Navbar = ({ currentPage, onChangePage }) => {
+const Navbar = ({ currentPage, onChangePage, onSelectTool }) => {
+  const [dropdownOpen, setDropdownOpen] = useState(false);
+
+  const handleToolClick = (toolType) => {
+    setDropdownOpen(false);
+    if (onSelectTool) {
+      onSelectTool(toolType);
+    }
+  };
+
   return (
     <nav className="navbar">
       <div className="navbar-container">
@@ -15,6 +24,34 @@ const Navbar = ({ currentPage, onChangePage }) => {
           >
             HOME
           </button>
+
+          {/* Replicating the tools dropdown from deepfakedetection.io */}
+          <div 
+            className="dropdown-wrapper"
+            onMouseEnter={() => setDropdownOpen(true)}
+            onMouseLeave={() => setDropdownOpen(false)}
+          >
+            <button className="nav-btn dropdown-trigger">
+              DETECTION TOOLS <span className="arrow-indicator">▼</span>
+            </button>
+            {dropdownOpen && (
+              <div className="dropdown-menu">
+                <button className="dropdown-item" onClick={() => handleToolClick('image')}>
+                  📷 Image Detection
+                </button>
+                <button className="dropdown-item" onClick={() => handleToolClick('video')}>
+                  🎥 Video Detection
+                </button>
+                <button className="dropdown-item" onClick={() => handleToolClick('audio')}>
+                  🎙️ Audio Detection
+                </button>
+                <button className="dropdown-item" onClick={() => handleToolClick('text')}>
+                  📝 Text Verification
+                </button>
+              </div>
+            )}
+          </div>
+
           <button 
             className={`nav-btn ${currentPage === 'features' ? 'active' : ''}`}
             onClick={() => onChangePage('features')}
