@@ -4,11 +4,12 @@ import urllib.parse
 import json
 from typing import List, Tuple
 from models.schemas import AnalysisDetail, RiskLevel
+from core.groq_client import groq_client
 
 class RAGVerifier:
     """
     RAG-backed claim verification engine.
-    Now upgraded to perform REAL LIVE queries against Wikipedia API to verify claims.
+    Uses Wikipedia for context, and Groq LLM to verify claims against the context.
     """
 
     CLAIM_PATTERNS = [
@@ -30,11 +31,64 @@ class RAGVerifier:
         
         for claim in extracted_claims:
             claims_found += 1
-            # Perform Live Web Search
             snippet = self._query_wikipedia(claim)
             
-            if snippet:
-                # Clean HTML tags from Wikipedia snippet
+            if snippet and groq_client:
+                clean_snippet = re.sub(r'<[^>]+>', '', snippet)
+                
+                # Use Groq to evaluate the claim against the snippet
+                prompt = f"""
+You are a fact-checking assistant. Evaluate if the following claim is supported by the provided context.
+
+Claim: "{claim}"
+Context: "{clean_snippet}"
+
+Output JSON:
+{{
+    "supported": true | false,
+    "reasoning": "Brief explanation"
+}}
+"""
+                try:
+                    response = groq_client.chat.completions.create(
+                        messages=[{"role": "user", "content": prompt}],
+                        model="llama-3.1-8b-instant",
+                        response_format={"type": "json_object"},
+                        temperature=0.0
+                    )
+                    result = json.loads(response.choices[0].message.content)
+                    is_supported = result.get("supported", False)
+                    reasoning = result.get("reasoning", "")
+                    
+                    if is_supported:
+                        claims_verified += 1
+                        details.append(AnalysisDetail(
+                            category="Live Web Verification",
+                            finding=f"Verified Claim: '{claim[:60]}...' | Reason: {reasoning}",
+                            confidence=0.9,
+                            severity=RiskLevel.LOW
+                        ))
+                    else:
+                        claims_flagged += 1
+                        details.append(AnalysisDetail(
+                            category="Claim Verification",
+                            finding=f"Refuted/Unverified Claim: '{claim[:80]}...' | Context conflicts: {reasoning}",
+                            confidence=0.8,
+                            severity=RiskLevel.HIGH
+                        ))
+                except Exception as e:
+                    print(f"Groq RAG evaluation error: {e}")
+                    # Fallback
+                    claims_verified += 1
+                    details.append(AnalysisDetail(
+                        category="Live Web Verification",
+                        finding=f"Claim: '{claim[:60]}...' | Internet Context: '{clean_snippet[:120]}...'",
+                        confidence=0.85,
+                        severity=RiskLevel.LOW
+                    ))
+
+            elif snippet:
+                # Fallback if groq_client fails
                 clean_snippet = re.sub(r'<[^>]+>', '', snippet)
                 claims_verified += 1
                 details.append(AnalysisDetail(
@@ -73,12 +127,11 @@ class RAGVerifier:
             if claim_clean not in seen and len(claim_clean) > 10:
                 seen.add(claim_clean)
                 unique_claims.append(claim.strip())
-        return unique_claims[:5] # Max 5 claims to keep it real-time
+        return unique_claims[:3]  # Max 3 to reduce API calls
 
     def _query_wikipedia(self, claim: str) -> str:
         """Query Wikipedia API live to find supporting context."""
         try:
-            # Search using the most salient words of the claim
             words = [w for w in claim.split() if len(w) > 4][:5]
             if not words:
                 return None

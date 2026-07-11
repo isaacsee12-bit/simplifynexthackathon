@@ -1,0 +1,10 @@
+# Python
+__pycache__/
+*.pyc
+
+# Environment
+.env
+
+# Test results
+test_results.json
+api_test.json

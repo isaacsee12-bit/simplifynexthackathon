@@ -1,56 +1,17 @@
-import re
+import json
 from typing import List, Tuple
 from models.schemas import AnalysisDetail, RiskLevel
-
-try:
-    from transformers import pipeline
-    print("Loading HuggingFace RoBERTa AI Detector model... This may take a moment.")
-    ai_detector = pipeline("text-classification", model="roberta-base-openai-detector", device=-1)
-except ImportError:
-    ai_detector = None
-    print("Transformers not installed. Falling back to heuristics.")
-except Exception as e:
-    ai_detector = None
-    print(f"Error loading HuggingFace model: {e}. Falling back to heuristics.")
-
+from core.groq_client import groq_client
 
 class TextAnalyzer:
     """
-    Analyzes text content for:
-    - AI-generated text patterns (via Neural Networks)
-    - Scam/phishing indicators
-    - Misinformation markers
+    Analyzes text content for AI generation, scams, and misinformation using Groq LLM.
     """
-
-    AI_PATTERNS = [
-        (r'\b(as an ai|as a language model|i cannot|i\'m an ai)\b', "AI self-reference detected", 0.95),
-        (r'\b(delve|tapestry|multifaceted|comprehensive|leverag(e|ing)|synerg)\b', "Overused AI vocabulary", 0.4),
-        (r'\b(in conclusion|to summarize|it\'s worth noting|it is important to note)\b', "Formulaic AI phrasing", 0.35),
-        (r'\b(furthermore|moreover|additionally|consequently)\b', "Excessive formal connectors", 0.25),
-    ]
-
-    SCAM_PATTERNS = [
-        (r'\b(urgent|act now|limited time|expire|hurry)\b', "Urgency pressure tactic", 0.7),
-        (r'\b(congratulations|you\'ve won|claim your|free gift|winner)\b', "Prize/reward bait", 0.85),
-        (r'\b(verify your (account|identity|password)|confirm your|update your payment)\b', "Credential phishing attempt", 0.9),
-        (r'\b(click (here|this link|below)|follow this link)\b', "Suspicious link prompt", 0.6),
-        (r'\b(wire transfer|western union|bitcoin|crypto wallet|gift card)\b', "Suspicious payment method", 0.8),
-        (r'\b(nigerian|prince|inheritance|beneficiary|estate)\b', "Advance-fee fraud markers", 0.9),
-        (r'\b(irs|social security|arrest warrant|legal action)\b', "Government impersonation", 0.85),
-        (r'\b(password|ssn|social security number|credit card number|bank account)\b', "Sensitive data request", 0.75),
-        (r'(https?://[^\s]+(?:bit\.ly|tinyurl|t\.co|goo\.gl|short))', "Shortened/suspicious URL", 0.65),
-    ]
-
-    MISINFO_PATTERNS = [
-        (r'\b(they don\'t want you to know|the truth is being hidden|cover.?up|conspiracy)\b', "Conspiracy language", 0.6),
-        (r'\b(100% (proven|guaranteed|effective)|miracle cure|scientists hate)\b', "Clickbait/sensationalism", 0.7),
-        (r'\b(wake up|sheeple|mainstream media lies|fake news)\b', "Inflammatory rhetoric", 0.55),
-    ]
 
     def analyze(self, text: str) -> Tuple[List[AnalysisDetail], dict]:
         details = []
-        text_lower = text.lower()
         text_length = len(text)
+        word_count = len(text.split())
 
         if text_length < 10:
             details.append(AnalysisDetail(
@@ -59,62 +20,95 @@ class TextAnalyzer:
                 confidence=0.1,
                 severity=RiskLevel.LOW
             ))
-            return details, {"text_length": text_length}
+            return details, {"text_length": text_length, "word_count": word_count}
 
-        ai_score = 0
-        if ai_detector:
-            try:
-                result = ai_detector(text[:2000])[0]
-                if result['label'] == 'Fake' and result['score'] > 0.6:
-                    confidence = result['score']
-                    ai_score = confidence
-                    severity = RiskLevel.CRITICAL if confidence > 0.9 else RiskLevel.HIGH if confidence > 0.75 else RiskLevel.MEDIUM
-                    details.append(AnalysisDetail(
-                        category="AI Generation (Neural Net)",
-                        finding=f"Deep Learning model detected synthetic text patterns",
-                        confidence=round(confidence, 2),
-                        severity=severity
-                    ))
-            except Exception as e:
-                print(f"Model inference error: {e}")
+        if not groq_client:
+            details.append(AnalysisDetail(
+                category="System Error",
+                finding="Groq API key not configured. Text analysis unavailable.",
+                confidence=1.0,
+                severity=RiskLevel.CRITICAL
+            ))
+            return details, {"text_length": text_length, "word_count": word_count}
+
+        prompt = f"""
+You are an expert AI and fraud detection system. Analyze the following text for:
+1. AI Generation (Does it sound like an LLM? Overly formal, formulaic, specific buzzwords?)
+2. Scam/Phishing (Urgency, requests for money/credentials, suspicious links?)
+3. Misinformation (Clickbait, conspiracy theories, unsubstantiated dramatic claims?)
+
+Output your analysis in JSON format with the following structure:
+{{
+  "details": [
+    {{
+      "category": "AI Generation" | "Scam Phishing" | "Manipulation",
+      "finding": "Short description of what you found and why",
+      "confidence": (float between 0.0 and 1.0),
+      "severity": "low" | "medium" | "high" | "critical"
+    }}
+  ],
+  "scores": {{
+    "ai_score": (float 0.0 to 1.0),
+    "scam_score": (float 0.0 to 1.0),
+    "misinfo_score": (float 0.0 to 1.0)
+  }}
+}}
+
+Text to analyze:
+\"\"\"
+{text[:4000]}
+\"\"\"
+"""
+        
+        try:
+            response = groq_client.chat.completions.create(
+                messages=[{"role": "user", "content": prompt}],
+                model="llama-3.1-8b-instant",
+                response_format={"type": "json_object"},
+                temperature=0.1
+            )
+            
+            result_json = json.loads(response.choices[0].message.content)
+            
+            for item in result_json.get("details", []):
+                sev_str = item.get("severity", "low").lower()
+                if sev_str == "critical": severity = RiskLevel.CRITICAL
+                elif sev_str == "high": severity = RiskLevel.HIGH
+                elif sev_str == "medium": severity = RiskLevel.MEDIUM
+                else: severity = RiskLevel.LOW
                 
-        if ai_score == 0:
-            ai_score = self._check_patterns(text_lower, self.AI_PATTERNS, "AI Generation (Heuristic)", details)
-
-        scam_score = self._check_patterns(text_lower, self.SCAM_PATTERNS, "Scam Phishing", details)
-        misinfo_score = self._check_patterns(text_lower, self.MISINFO_PATTERNS, "Manipulation", details)
-
-        extra_context = {
-            "text_length": text_length,
-            "word_count": len(text.split()),
-            "ai_score": ai_score,
-            "scam_score": scam_score,
-            "misinfo_score": misinfo_score,
-        }
-
-        return details, extra_context
-
-    def _check_patterns(self, text: str, patterns: list, category: str, details: List[AnalysisDetail]) -> float:
-        total_confidence = 0
-        match_count = 0
-        for pattern, description, confidence in patterns:
-            matches = re.findall(pattern, text, re.IGNORECASE)
-            if matches:
-                match_count += 1
-                adjusted_confidence = min(confidence + (len(matches) - 1) * 0.05, 0.99)
-                total_confidence += adjusted_confidence
-                severity = (
-                    RiskLevel.CRITICAL if adjusted_confidence >= 0.85
-                    else RiskLevel.HIGH if adjusted_confidence >= 0.65
-                    else RiskLevel.MEDIUM if adjusted_confidence >= 0.4
-                    else RiskLevel.LOW
-                )
                 details.append(AnalysisDetail(
-                    category=category,
-                    finding=f"{description} ({len(matches)} occurrence{'s' if len(matches) > 1 else ''})",
-                    confidence=round(adjusted_confidence, 2),
+                    category=item.get("category", "General"),
+                    finding=item.get("finding", "No finding description provided."),
+                    confidence=float(item.get("confidence", 0.0)),
                     severity=severity
                 ))
-        return total_confidence / max(match_count, 1)
+            
+            scores = result_json.get("scores", {})
+            extra_context = {
+                "text_length": text_length,
+                "word_count": word_count,
+                "ai_score": float(scores.get("ai_score", 0.0)),
+                "scam_score": float(scores.get("scam_score", 0.0)),
+                "misinfo_score": float(scores.get("misinfo_score", 0.0)),
+            }
+            
+        except Exception as e:
+            print(f"Groq API error during text analysis: {e}")
+            details.append(AnalysisDetail(
+                category="System Error",
+                finding=f"Groq API error: {str(e)}",
+                confidence=1.0,
+                severity=RiskLevel.MEDIUM
+            ))
+            extra_context = {
+                "text_length": text_length,
+                "word_count": word_count,
+                "ai_score": 0.0,
+                "scam_score": 0.0,
+                "misinfo_score": 0.0,
+            }
+
+        return details, extra_context
 
 text_analyzer = TextAnalyzer()
