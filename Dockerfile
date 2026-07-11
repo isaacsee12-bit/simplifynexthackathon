@@ -22,8 +22,5 @@ COPY backend/ .
 # Copy built frontend from Stage 1
 COPY --from=frontend-builder /app/webapp/dist /app/webapp/dist
 
-# Expose port
-EXPOSE 8000
-
 # Start FastAPI server
-CMD ["python", "main.py"]
+CMD uvicorn main:app --host 0.0.0.0 --port ${PORT:-8000}
