@@ -21,10 +21,18 @@ class TrustScoreEngine:
     def calculate_trust_score(details: List[AnalysisDetail]) -> float:
         """
         Calculate overall trust score (0-100) from individual findings.
-        Higher score = MORE trustworthy / more likely manipulated was detected.
+        Higher score = MORE manipulated/anomalous (used as risk score).
         """
         if not details:
-            return 50.0  # Neutral if no analysis
+            return 0.0  # Clean/Authentic if no anomalies detected
+
+        # Multipliers based on severity
+        severity_multipliers = {
+            RiskLevel.LOW: 0.1,
+            RiskLevel.MEDIUM: 0.4,
+            RiskLevel.HIGH: 0.8,
+            RiskLevel.CRITICAL: 1.0
+        }
 
         total_weight = 0
         weighted_score = 0
@@ -32,11 +40,16 @@ class TrustScoreEngine:
         for detail in details:
             category = detail.category.lower().replace(" ", "_")
             weight = TrustScoreEngine.CATEGORY_WEIGHTS.get(category, 0.15)
-            weighted_score += detail.confidence * weight * 100
+            
+            # Map severity, defaulting to LOW if not found
+            mult = severity_multipliers.get(detail.severity, 0.1)
+            detail_risk = detail.confidence * mult * 100
+            
+            weighted_score += detail_risk * weight
             total_weight += weight
 
         if total_weight == 0:
-            return 50.0
+            return 0.0
 
         raw_score = weighted_score / total_weight
         # Clamp between 0 and 100
@@ -126,7 +139,7 @@ class TrustScoreEngine:
             )
 
         explanation_parts.append("")
-        explanation_parts.append(f"Trust Score: {trust_score}%")
+        explanation_parts.append(f"Authenticity Score: {round(100 - trust_score, 1)}%")
 
         return summary, "\n".join(explanation_parts)
 

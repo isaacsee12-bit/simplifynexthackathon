@@ -31,8 +31,8 @@ async def analyze_video(file: UploadFile = File(...)):
     summary, explanation = trust_engine.generate_explanation(
         "video", trust_score, risk_level, vid_details,
         extra_context={
-            "total_frames": vid_context.get("total_frames", 0),
-            "deepfake_frames": vid_context.get("deepfake_frames", 0),
+            "total_frames": vid_context.get("total_frames_estimated", 0),
+            "deepfake_frames": vid_context.get("deepfake_frames_sampled", 0),
         }
     )
 
@@ -48,8 +48,8 @@ async def analyze_video(file: UploadFile = File(...)):
         summary=summary,
         explanation=explanation,
         details=vid_details,
-        total_frames=vid_context.get("total_frames"),
-        deepfake_frames=vid_context.get("deepfake_frames"),
+        total_frames=vid_context.get("total_frames_estimated"),
+        deepfake_frames=vid_context.get("deepfake_frames_sampled"),
         frame_analyses=vid_context.get("frame_analyses"),
         processing_time_ms=round(processing_time, 1),
     )

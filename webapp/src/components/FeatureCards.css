@@ -1,0 +1,54 @@
+.features-section {
+  padding: 120px 0;
+  text-align: left;
+}
+
+.features-header {
+  margin-bottom: 64px;
+  max-width: 600px;
+}
+
+.features-header h2 {
+  font-size: 32px;
+  font-weight: 500;
+  letter-spacing: -0.02em;
+  margin-top: 12px;
+  text-transform: uppercase;
+}
+
+.features-header p {
+  color: var(--text-secondary);
+  font-size: 14px;
+  line-height: 1.6;
+  margin-top: 16px;
+}
+
+.feature-card {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.feature-icon-wrapper {
+  font-size: 20px;
+  background: var(--bg-primary);
+  width: 44px;
+  height: 44px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 8px;
+  border: 1px solid var(--border-light);
+}
+
+.feature-card h3 {
+  font-size: 20px;
+  font-weight: 500;
+  letter-spacing: -0.01em;
+}
+
+.feature-card p {
+  color: var(--text-secondary);
+  font-size: 14px;
+  line-height: 1.5;
+}

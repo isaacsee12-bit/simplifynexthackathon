@@ -25,7 +25,7 @@ const TrustScoreGauge = ({ score }) => {
   }, [score]);
 
   // Convert "Manipulation Score" (trust_score) to "Authenticity Score" for UX
-  const authenticityScore = Math.max(0, 100 - animatedScore);
+  const authenticityScore = Math.round(Math.max(0, 100 - animatedScore));
   
   let colorClass = 'gauge-success';
   if (authenticityScore < 40) colorClass = 'gauge-danger';

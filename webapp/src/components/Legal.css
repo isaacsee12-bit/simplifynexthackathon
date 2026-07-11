@@ -1,0 +1,36 @@
+.legal-section {
+  padding: 80px 20px;
+  max-width: 800px;
+  margin: 0 auto;
+  min-height: 60vh;
+}
+
+.legal-section h2 {
+  font-family: var(--font-main);
+  color: var(--text-primary);
+  margin-bottom: 24px;
+  letter-spacing: 0.1em;
+}
+
+.legal-section h3 {
+  font-family: var(--font-main);
+  color: var(--text-primary);
+  margin-top: 32px;
+  margin-bottom: 16px;
+  font-size: 1.2rem;
+}
+
+.legal-section p, .legal-section ul {
+  font-family: var(--font-mono);
+  color: var(--text-secondary);
+  line-height: 1.6;
+  margin-bottom: 16px;
+}
+
+.legal-section ul {
+  padding-left: 20px;
+}
+
+.legal-section li {
+  margin-bottom: 8px;
+}

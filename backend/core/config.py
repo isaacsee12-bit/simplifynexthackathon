@@ -7,14 +7,13 @@ class Settings:
     APP_DESCRIPTION: str = "Multimodal Content Verification System"
     
     # Server
-    HOST: str = "0.0.0.0"
-    PORT: int = 8000
+    HOST: str = os.environ.get("HOST", "0.0.0.0")
+    PORT: int = int(os.environ.get("PORT", 8000))
     
     # CORS origins
     CORS_ORIGINS: list = [
         "http://localhost:5173",   # Vite dev server
         "http://localhost:3000",
-        "chrome-extension://*",
         "*"
     ]
     

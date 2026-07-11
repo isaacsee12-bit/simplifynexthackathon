@@ -9,8 +9,8 @@ const AnalysisResult = ({ result, onReset }) => {
   return (
     <div id="results-view" className="results-section container animate-fade-in">
       <div className="results-header">
-        <h2>Analysis Result</h2>
-        <button className="btn btn-secondary" onClick={onReset}>New Scan</button>
+        <h2>ANALYSIS RESULT</h2>
+        <button className="btn btn-secondary" onClick={onReset}>NEW SCAN</button>
       </div>
 
       <div className="results-grid">
@@ -23,7 +23,7 @@ const AnalysisResult = ({ result, onReset }) => {
           <div className="status-container">
             <RiskBadge riskLevel={result.risk_level} />
             <h3 className="status-title">
-              {result.is_authentic ? 'Likely Authentic' : 'Manipulation Detected'}
+              {result.is_authentic ? 'LIKELY AUTHENTIC' : 'MANIPULATION DETECTED'}
             </h3>
             <p className="status-summary">{result.summary}</p>
           </div>
@@ -32,8 +32,8 @@ const AnalysisResult = ({ result, onReset }) => {
         {/* Right Column: Detailed Explanation */}
         <div className="glass-card result-details">
           <div className="details-header">
-            <h3>Detailed Findings</h3>
-            <span className="content-badge">{result.content_type} Analysis</span>
+            <h3>DETAILED FINDINGS</h3>
+            <span className="content-badge">{result.content_type.toUpperCase()} ANALYSIS</span>
           </div>
           
           <div className="explanation-text">
@@ -49,8 +49,8 @@ const AnalysisResult = ({ result, onReset }) => {
                     <div key={idx} className="finding-item">
                       <span className="finding-icon">{icon}</span>
                       <div className="finding-content">
-                        <strong>{detail.category}</strong>
-                        <span>{detail.finding} (Confidence: {Math.round(detail.confidence * 100)}%)</span>
+                        <strong>{detail.category.toUpperCase()}</strong>
+                        <span className="finding-detail">{detail.finding} (CONFIDENCE: {Math.round(detail.confidence * 100)}%)</span>
                       </div>
                     </div>
                   );
@@ -59,8 +59,8 @@ const AnalysisResult = ({ result, onReset }) => {
                 <div className="finding-item">
                   <span className="finding-icon">✅</span>
                   <div className="finding-content">
-                    <strong>Clear</strong>
-                    <span>No specific anomalies or manipulation detected.</span>
+                    <strong>CLEAR</strong>
+                    <span className="finding-detail">No anomalies or manipulation signatures identified.</span>
                   </div>
                 </div>
               )}
@@ -68,7 +68,7 @@ const AnalysisResult = ({ result, onReset }) => {
           </div>
           
           <div className="metadata-footer">
-            <span>Processed in {result.processing_time_ms}ms via Fast API</span>
+            <span>PROCESSED IN {result.processing_time_ms}MS VIA FASTDETECT API</span>
           </div>
         </div>
       </div>

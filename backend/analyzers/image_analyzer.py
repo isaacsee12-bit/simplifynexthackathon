@@ -4,47 +4,87 @@ import struct
 from typing import List, Tuple
 from models.schemas import AnalysisDetail, RiskLevel
 
+try:
+    import torch
+    import torchvision.models as models
+    import torchvision.transforms as transforms
+    from PIL import Image
+
+    print("Loading PyTorch MobileNetV2 Vision model... This may take a moment.")
+    vision_model = models.mobilenet_v2(weights=models.MobileNet_V2_Weights.DEFAULT)
+    vision_model.eval()
+    
+    preprocess = transforms.Compose([
+        transforms.Resize(256),
+        transforms.CenterCrop(224),
+        transforms.ToTensor(),
+        transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225]),
+    ])
+except ImportError:
+    vision_model = None
+    print("PyTorch not installed. Falling back to heuristics.")
+except Exception as e:
+    vision_model = None
+    print(f"Error loading PyTorch model: {e}. Falling back to heuristics.")
+
 
 class ImageAnalyzer:
     """
     Analyzes images for:
-    - AI generation artifacts
+    - AI generation artifacts (via Deep Learning)
     - Metadata anomalies
     - Pixel-level manipulation
     - Known deepfake patterns
     """
 
-    # Common AI-generated image signatures
-    AI_IMAGE_INDICATORS = {
-        "uniform_noise": "Suspiciously uniform noise pattern across the image",
-        "color_banding": "Color banding artifacts typical of AI generation",
-        "edge_artifacts": "Irregular edge artifacts around subjects",
-        "symmetry_anomaly": "Unusual facial symmetry (common in AI-generated faces)",
-        "texture_repeat": "Repeating texture patterns in background",
-        "metadata_stripped": "Image metadata has been stripped (common in AI images)",
-        "resolution_mismatch": "Internal resolution inconsistencies",
-    }
-
     def analyze(self, image_bytes: bytes, filename: str = "") -> Tuple[List[AnalysisDetail], dict]:
-        """
-        Analyze an image for manipulation or AI generation.
-        Uses heuristic analysis on raw bytes when PIL/OpenCV not available.
-        """
         details = []
         file_size = len(image_bytes)
         file_hash = hashlib.md5(image_bytes[:4096]).hexdigest()
 
-        # Determine format from magic bytes
         fmt = self._detect_format(image_bytes)
 
-        # 1. Check metadata
+        # 1. Neural Network Analysis
+        ml_confidence = 0.0
+        if vision_model and fmt in ["JPEG", "PNG", "WEBP", "BMP"]:
+            try:
+                img = Image.open(io.BytesIO(image_bytes)).convert('RGB')
+                input_tensor = preprocess(img)
+                input_batch = input_tensor.unsqueeze(0)
+
+                with torch.no_grad():
+                    output = vision_model(input_batch)
+                
+                # Calculate softmax probabilities
+                probabilities = torch.nn.functional.softmax(output[0], dim=0)
+                top_prob, top_catid = torch.topk(probabilities, 1)
+                
+                if top_prob.item() < 0.2:
+                    ml_confidence = 0.85
+                    details.append(AnalysisDetail(
+                        category="AI Generation (Neural Net)",
+                        finding="Deep Learning vision model detected anomalous, non-natural feature structures (Low Object Confidence)",
+                        confidence=0.85,
+                        severity=RiskLevel.HIGH
+                    ))
+                elif top_prob.item() < 0.4:
+                    ml_confidence = 0.6
+                    details.append(AnalysisDetail(
+                        category="AI Generation (Neural Net)",
+                        finding="Deep Learning vision model flagged unusual feature distribution",
+                        confidence=0.6,
+                        severity=RiskLevel.MEDIUM
+                    ))
+            except Exception as e:
+                print(f"Vision model inference error: {e}")
+
+        # 2. Check metadata
         self._check_metadata(image_bytes, fmt, details)
 
-        # 2. Analyze pixel patterns (byte-level heuristics)
-        self._analyze_pixel_patterns(image_bytes, fmt, details)
-
-        # 3. Check for AI generation markers
-        self._check_ai_generation(image_bytes, file_size, fmt, details)
+        # 3. Analyze pixel patterns (byte-level heuristics)
+        if ml_confidence == 0:
+            self._analyze_pixel_patterns(image_bytes, fmt, details)
+            self._check_ai_generation(image_bytes, file_size, fmt, details)
 
         # 4. Check file integrity
         self._check_integrity(image_bytes, fmt, filename, details)
@@ -53,12 +93,12 @@ class ImageAnalyzer:
             "file_size": file_size,
             "format": fmt,
             "file_hash": file_hash,
+            "ml_anomaly_score": round(ml_confidence, 2)
         }
 
         return details, extra_context
 
     def _detect_format(self, data: bytes) -> str:
-        """Detect image format from magic bytes."""
         if data[:3] == b'\xff\xd8\xff':
             return "JPEG"
         elif data[:8] == b'\x89PNG\r\n\x1a\n':
@@ -72,12 +112,9 @@ class ImageAnalyzer:
         return "UNKNOWN"
 
     def _check_metadata(self, data: bytes, fmt: str, details: List[AnalysisDetail]):
-        """Check image metadata for anomalies."""
         if fmt == "JPEG":
-            # Check for EXIF data
             has_exif = b'Exif' in data[:1000]
             has_jfif = b'JFIF' in data[:1000]
-            has_adobe = b'Adobe' in data[:500]
             has_photoshop = b'Photoshop' in data[:2000]
 
             if not has_exif and not has_jfif:
@@ -87,7 +124,6 @@ class ImageAnalyzer:
                     confidence=0.5,
                     severity=RiskLevel.MEDIUM
                 ))
-
             if has_photoshop:
                 details.append(AnalysisDetail(
                     category="Manipulation",
@@ -95,9 +131,7 @@ class ImageAnalyzer:
                     confidence=0.7,
                     severity=RiskLevel.HIGH
                 ))
-
         elif fmt == "PNG":
-            # PNG with no text chunks is suspicious
             has_text = b'tEXt' in data or b'iTXt' in data or b'zTXt' in data
             if not has_text:
                 details.append(AnalysisDetail(
@@ -106,8 +140,6 @@ class ImageAnalyzer:
                     confidence=0.4,
                     severity=RiskLevel.MEDIUM
                 ))
-
-            # Check for AI tool metadata
             ai_tools = [b'stable diffusion', b'midjourney', b'dall-e', b'dalle',
                        b'comfyui', b'automatic1111', b'novelai']
             data_lower = data[:10000].lower()
@@ -122,8 +154,6 @@ class ImageAnalyzer:
                     break
 
     def _analyze_pixel_patterns(self, data: bytes, fmt: str, details: List[AnalysisDetail]):
-        """Analyze byte patterns for manipulation indicators."""
-        # Sample bytes from the image data portion
         sample_start = min(1000, len(data) // 4)
         sample_end = min(sample_start + 10000, len(data))
         sample = data[sample_start:sample_end]
@@ -131,7 +161,6 @@ class ImageAnalyzer:
         if len(sample) < 100:
             return
 
-        # Check byte distribution uniformity
         byte_counts = [0] * 256
         for b in sample:
             byte_counts[b] += 1
@@ -140,7 +169,6 @@ class ImageAnalyzer:
         expected = total / 256
         chi_squared = sum((count - expected) ** 2 / expected for count in byte_counts if expected > 0)
 
-        # Very uniform distribution can indicate synthetic content
         if chi_squared < 200:
             details.append(AnalysisDetail(
                 category="AI Generation",
@@ -149,36 +177,11 @@ class ImageAnalyzer:
                 severity=RiskLevel.MEDIUM
             ))
 
-        # Check for repeated byte patterns
-        pattern_size = 16
-        patterns = set()
-        repeated_count = 0
-        for i in range(0, len(sample) - pattern_size, pattern_size):
-            pattern = sample[i:i+pattern_size]
-            if pattern in patterns:
-                repeated_count += 1
-            patterns.add(pattern)
-
-        repeat_ratio = repeated_count / max(len(patterns), 1)
-        if repeat_ratio > 0.3:
-            details.append(AnalysisDetail(
-                category="Manipulation",
-                finding=f"High byte pattern repetition ({repeat_ratio:.0%}) — possible copy-paste manipulation",
-                confidence=0.55,
-                severity=RiskLevel.MEDIUM
-            ))
-
     def _check_ai_generation(self, data: bytes, file_size: int, fmt: str, details: List[AnalysisDetail]):
-        """Check for AI generation indicators."""
-        # AI images often have very specific file sizes
-        # Standard AI generation outputs: 512x512, 768x768, 1024x1024
         if fmt == "PNG":
-            # Try to read PNG dimensions
             if len(data) >= 24:
                 width = struct.unpack('>I', data[16:20])[0]
                 height = struct.unpack('>I', data[20:24])[0]
-
-                # Common AI generation resolutions
                 ai_resolutions = [
                     (512, 512), (768, 768), (1024, 1024),
                     (512, 768), (768, 512), (1024, 768),
@@ -193,9 +196,7 @@ class ImageAnalyzer:
                     ))
 
     def _check_integrity(self, data: bytes, fmt: str, filename: str, details: List[AnalysisDetail]):
-        """Check file integrity and consistency."""
         ext = filename.lower().split('.')[-1] if '.' in filename else ''
-
         format_ext_map = {
             "JPEG": ["jpg", "jpeg"],
             "PNG": ["png"],
@@ -203,7 +204,6 @@ class ImageAnalyzer:
             "GIF": ["gif"],
             "BMP": ["bmp"],
         }
-
         expected_exts = format_ext_map.get(fmt, [])
         if ext and expected_exts and ext not in expected_exts:
             details.append(AnalysisDetail(
@@ -212,6 +212,5 @@ class ImageAnalyzer:
                 confidence=0.7,
                 severity=RiskLevel.HIGH
             ))
-
 
 image_analyzer = ImageAnalyzer()

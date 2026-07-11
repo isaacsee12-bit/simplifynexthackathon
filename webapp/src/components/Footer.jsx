@@ -1,21 +1,23 @@
 import React from 'react';
+import './Footer.css';
 
-const Footer = () => {
+const Footer = ({ onChangePage }) => {
   return (
-    <footer className="glass-panel" style={{ marginTop: '80px', padding: '40px 24px', borderRadius: '24px 24px 0 0', borderBottom: 'none' }}>
-      <div className="container" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '24px' }}>
-        <div>
-          <div className="navbar-logo" style={{ marginBottom: '8px' }}>
-            <span className="logo-icon">🔍</span>
-            <span className="logo-text">TruthLens <span className="text-gradient">AI</span></span>
+    <footer className="footer-bar">
+      <div className="container footer-container">
+        <div className="footer-brand">
+          <div className="footer-logo">
+            <span>TRUTHLENS <span className="logo-accent">AI</span></span>
           </div>
-          <p style={{ color: 'var(--text-muted)', fontSize: '0.9rem' }}>See through the lies.</p>
+          <span className="footer-tagline">Multimodal Content Verification</span>
         </div>
         
-        <div style={{ display: 'flex', gap: '24px' }}>
-          <a href="#" style={{ color: 'var(--text-secondary)', textDecoration: 'none' }}>Privacy</a>
-          <a href="#" style={{ color: 'var(--text-secondary)', textDecoration: 'none' }}>Terms</a>
-          <a href="#" style={{ color: 'var(--text-secondary)', textDecoration: 'none' }}>API</a>
+        <div className="footer-links">
+          <a href="#" onClick={(e) => { e.preventDefault(); onChangePage('privacy'); }}>Privacy</a>
+          <a href="#" onClick={(e) => { e.preventDefault(); onChangePage('terms'); }}>Terms</a>
+          <a href="http://localhost:8000/docs" target="_blank" rel="noopener noreferrer">API Documentation</a>
+          <a href="https://www.linkedin.com/in/yash-vijay-b0a75937a?utm_source=share_via&utm_content=profile&utm_medium=member_android" target="_blank" rel="noopener noreferrer">LinkedIn</a>
+          <a href="mailto:ktanayash@gmail.com">Contact</a>
         </div>
       </div>
     </footer>

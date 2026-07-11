@@ -45,9 +45,9 @@ class OCREngine:
         This catches text in metadata, embedded data, or text-heavy formats.
         """
         try:
-            # Try to find readable ASCII strings in the image data
+            # Try to find readable ASCII strings in the first 500KB of image data
             text_pattern = re.compile(rb'[\x20-\x7e]{10,}')
-            matches = text_pattern.findall(image_bytes)
+            matches = text_pattern.findall(image_bytes[:500000])
             if matches:
                 # Filter out obvious binary/metadata strings
                 readable = []

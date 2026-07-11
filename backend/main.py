@@ -48,4 +48,6 @@ async def root():
 
 if __name__ == "__main__":
     import uvicorn
-    uvicorn.run("main:app", host=settings.HOST, port=settings.PORT, reload=True)
+    # Use reload=True only if running locally on port 8000 (heuristic for dev)
+    is_dev = settings.PORT == 8000
+    uvicorn.run("main:app", host=settings.HOST, port=settings.PORT, reload=is_dev)

@@ -3,31 +3,23 @@ import './Hero.css';
 
 const Hero = () => {
   return (
-    <section className="hero">
+    <section className="hero container">
       <div className="hero-content animate-slide-up">
-        <div className="hero-badge">
-          <span className="badge-dot"></span>
-          State-of-the-Art Content Verification
+        <div className="section-stamp">
+          Content Verification Engine
         </div>
         <h1 className="hero-title">
-          See through <br/> the <span className="text-gradient">lies.</span>
+          SEE THROUGH THE <span className="text-gradient">LIES.</span>
         </h1>
         <p className="hero-subtitle">
-          Advanced multimodal AI that detects deepfakes, generated images, synthesized voices, and phishing attempts with forensic precision.
+          Advanced forensic AI that analyzes images, videos, audio, and text to spot deepfakes, synthetic speech, and phishing attempts.
         </p>
         <div className="hero-actions">
           <button className="btn btn-glow hero-btn" onClick={() => document.getElementById('upload-zone').scrollIntoView({ behavior: 'smooth' })}>
-            Analyze Content
+            ANALYZE CONTENT
           </button>
-          <a href="chrome://extensions" className="btn btn-secondary hero-btn">
-            Get Extension
-          </a>
         </div>
       </div>
-      
-      {/* Abstract background elements */}
-      <div className="glow-orb orb-1"></div>
-      <div className="glow-orb orb-2"></div>
     </section>
   );
 };

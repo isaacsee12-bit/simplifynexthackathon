@@ -2,10 +2,9 @@
 
 TruthLens AI is a **Multimodal Content Verification System** designed to detect deepfakes, AI-generated content, fake messages, and cloned voices. It provides a unified pipeline that analyzes text, images, videos, and audio to determine authenticity and explain the reasoning behind its assessment.
 
-The system is built as a complete ecosystem consisting of three main components:
+The system is built as an ecosystem consisting of two main components:
 1. **FastAPI Backend (Python)** - The core AI analysis pipeline.
 2. **React Web App (Vite)** - A stunning, dark-mode dashboard for uploading and analyzing media.
-3. **Chrome Extension (Manifest V3)** - A browser-integrated tool for verifying content directly on web pages via context menus, popups, and side panels.
 
 ---
 
@@ -26,13 +25,6 @@ The system is built as a complete ecosystem consisting of three main components:
 
 ```mermaid
 graph TB
-    subgraph "Chrome Extension"
-        CE_POPUP["Extension Popup"]
-        CE_SIDE["Side Panel UI"]
-        CE_CONTENT["Content Script"]
-        CE_BG["Service Worker"]
-    end
-
     subgraph "React Web App"
         DASH["Dashboard"]
         UPLOAD["Upload & Analyze"]
@@ -52,10 +44,6 @@ graph TB
         end
         SCORE["Trust Score Engine"]
     end
-
-    CE_CONTENT -->|"Extract content"| CE_BG
-    CE_BG -->|"API calls"| API
-    CE_SIDE -->|"Display results"| CE_BG
 
     DASH --> API
     UPLOAD --> API
@@ -121,16 +109,6 @@ npm run dev
 ```
 The web app will be available at `http://localhost:5173`.
 
-### 3. Setup the Chrome Extension
-
-The extension allows users to analyze content anywhere on the web.
-
-1. Open Google Chrome and navigate to `chrome://extensions/`.
-2. Enable **"Developer mode"** in the top right corner.
-3. Click **"Load unpacked"**.
-4. Select the `extension` folder inside this project directory.
-5. The TruthLens AI extension is now installed! You can access it via the extension popup, side panel, or right-click context menu.
-
 ---
 
 ## 🛠️ Tech Stack Details
@@ -147,10 +125,6 @@ The extension allows users to analyze content anywhere on the web.
 *   **Styling**: Vanilla CSS with modern practices (CSS Variables, Flexbox/Grid, Glassmorphism).
 *   **Icons**: Lucide React / Phosphor Icons (recommended).
 
-### Chrome Extension
-*   **Standard**: Manifest V3
-*   **Features**: `sidePanel` API, Service Workers, Content Scripts, Context Menus.
-
 ---
 
 ## 📊 Analysis Pipeline
@@ -164,6 +138,23 @@ The extension allows users to analyze content anywhere on the web.
 3.  **Claim Verification**: Extracted text/claims are cross-referenced with a known truth base (RAG).
 4.  **Trust Scoring**: The `TrustScoreEngine` aggregates all findings, applies category weights, and calculates a final 0-100% score.
 5.  **Explanation Generation**: A human-readable summary and detailed breakdown are generated.
+
+---
+
+## 🧪 Testing
+
+The repository contains an automated test suite to verify the multimodal analysis pipelines.
+
+```bash
+cd backend
+python -m pytest tests/run_rigorous_tests.py
+```
+Or run the script directly:
+```bash
+python tests/run_rigorous_tests.py
+```
+
+This script will run inferences across provided verification files (`tests/verification_files/`) for text, images, audio, and video to ensure the system is correctly flagging fraudulent content and passing authentic materials.
 
 ---
 

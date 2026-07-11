@@ -53,6 +53,7 @@ const UploadZone = ({ onAnalysisComplete }) => {
   const handleFileInput = (e) => {
     if (e.target.files && e.target.files.length > 0) {
       processFile(e.target.files[0]);
+      e.target.value = '';
     }
   };
 
@@ -81,13 +82,13 @@ const UploadZone = ({ onAnalysisComplete }) => {
             className={`tab-btn ${activeTab === 'file' ? 'active' : ''}`}
             onClick={() => setActiveTab('file')}
           >
-            Upload Media
+            UPLOAD MEDIA
           </button>
           <button 
             className={`tab-btn ${activeTab === 'text' ? 'active' : ''}`}
             onClick={() => setActiveTab('text')}
           >
-            Verify Text
+            VERIFY TEXT
           </button>
         </div>
 
@@ -110,15 +111,15 @@ const UploadZone = ({ onAnalysisComplete }) => {
             {isAnalyzing ? (
               <div className="analyzing-state">
                 <div className="spinner-rings"></div>
-                <h3>Analyzing Content</h3>
+                <h3>ANALYZING CONTENT</h3>
                 <p>Running multimodal verification models...</p>
               </div>
             ) : (
               <label htmlFor="file-upload" className="drop-content">
                 <div className="upload-icon">📁</div>
-                <h3>Drag & Drop</h3>
+                <h3>DRAG & DROP</h3>
                 <p>Images, Video, or Audio formats supported</p>
-                <div className="btn btn-secondary">Select File</div>
+                <div className="btn btn-secondary">SELECT FILE</div>
               </label>
             )}
           </div>
@@ -137,7 +138,7 @@ const UploadZone = ({ onAnalysisComplete }) => {
                 onClick={handleTextAnalyze}
                 disabled={isAnalyzing || !textInput.trim()}
               >
-                {isAnalyzing ? 'Processing...' : 'Run Analysis'}
+                {isAnalyzing ? 'PROCESSING...' : 'RUN ANALYSIS'}
               </button>
             </div>
           </div>

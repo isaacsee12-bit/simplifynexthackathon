@@ -1,5 +1,5 @@
 .results-section {
-  padding: 80px 24px;
+  padding: 80px 0;
 }
 
 .results-header {
@@ -7,15 +7,19 @@
   justify-content: space-between;
   align-items: center;
   margin-bottom: 40px;
+  border-bottom: 1px solid var(--border-light);
+  padding-bottom: 16px;
 }
 
 .results-header h2 {
-  font-size: 2rem;
+  font-size: 24px;
+  font-weight: 500;
+  letter-spacing: -0.02em;
 }
 
 .results-grid {
   display: grid;
-  grid-template-columns: 350px 1fr;
+  grid-template-columns: 320px 1fr;
   gap: 24px;
 }
 
@@ -26,11 +30,13 @@
   align-items: center;
   text-align: center;
   gap: 32px;
-  background: var(--bg-tertiary);
+  background: var(--bg-secondary);
 }
 
 .score-container {
   padding: 16px 0;
+  display: flex;
+  justify-content: center;
 }
 
 .status-container {
@@ -40,13 +46,15 @@
 }
 
 .status-title {
-  font-size: 1.25rem;
+  font-size: 16px;
+  font-weight: 500;
   margin: 16px 0 8px;
+  letter-spacing: -0.01em;
 }
 
 .status-summary {
   color: var(--text-secondary);
-  font-size: 0.9rem;
+  font-size: 14px;
   line-height: 1.5;
 }
 
@@ -54,38 +62,41 @@
 .result-details {
   display: flex;
   flex-direction: column;
+  background: var(--bg-secondary);
 }
 
 .details-header {
   display: flex;
   justify-content: space-between;
-  align-items: baseline;
+  align-items: center;
   margin-bottom: 24px;
   padding-bottom: 16px;
   border-bottom: 1px solid var(--border-light);
 }
 
 .details-header h3 {
-  font-size: 1.25rem;
+  font-size: 20px;
+  font-weight: 500;
   margin: 0;
 }
 
 .content-badge {
   background: var(--bg-elevated);
-  padding: 4px 12px;
-  border-radius: 999px;
-  font-size: 0.75rem;
-  font-weight: 600;
+  padding: 4px 10px;
+  border-radius: 6px; /* 6px inputs/small radii */
+  font-family: var(--font-mono);
+  font-size: 10px;
+  font-weight: 400;
   text-transform: uppercase;
-  color: var(--text-secondary);
+  color: var(--accent-cyan);
   border: 1px solid var(--border-light);
 }
 
 .explanation-text {
   flex: 1;
-  font-size: 0.95rem;
+  font-size: 14px;
   line-height: 1.6;
-  color: #d4d4d8; /* Zinc 300 */
+  color: var(--text-primary);
 }
 
 .explanation-text p {
@@ -101,15 +112,15 @@
   display: flex;
   align-items: flex-start;
   gap: 12px;
-  padding: 12px 16px;
-  background: rgba(255,255,255,0.02);
+  padding: 16px;
+  background: var(--bg-primary);
   border-radius: 8px;
-  border: 1px solid rgba(255,255,255,0.05);
+  border: 1px solid var(--border-light);
   margin-bottom: 12px;
 }
 
 .finding-icon {
-  font-size: 1.25rem;
+  font-size: 16px;
   line-height: 1;
 }
 
@@ -120,10 +131,16 @@
 .finding-content strong {
   display: block;
   color: var(--text-primary);
-  font-size: 0.85rem;
-  text-transform: uppercase;
-  letter-spacing: 0.05em;
+  font-family: var(--font-mono);
+  font-size: 11px;
+  font-weight: 400;
+  letter-spacing: 0.1em;
   margin-bottom: 4px;
+}
+
+.finding-detail {
+  font-size: 13px;
+  color: var(--text-secondary);
 }
 
 .metadata-footer {
@@ -132,26 +149,31 @@
   border-top: 1px dashed var(--border-light);
   display: flex;
   justify-content: flex-end;
-  font-size: 0.8rem;
+  font-family: var(--font-mono);
+  font-size: 10px;
   color: var(--text-muted);
+  letter-spacing: 0.05em;
 }
 
-/* Gauge Styles */
+/* Gauge Styles - Strict Flat Rings */
 .gauge-container {
   position: relative;
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  filter: drop-shadow(0 10px 20px rgba(0,0,0,0.5));
 }
 
 .gauge-bg {
-  stroke: rgba(255, 255, 255, 0.05);
+  stroke: rgba(247, 249, 250, 0.06);
 }
 
-.gauge-success { stroke: var(--status-success); filter: drop-shadow(0 0 10px rgba(16,185,129,0.3)); }
-.gauge-warning { stroke: var(--status-warning); filter: drop-shadow(0 0 10px rgba(245,158,11,0.3)); }
-.gauge-danger { stroke: var(--status-danger); filter: drop-shadow(0 0 10px rgba(239,68,68,0.3)); }
+.gauge-progress {
+  transition: stroke-dashoffset 0.5s ease;
+}
+
+.gauge-success { stroke: var(--status-success); }
+.gauge-warning { stroke: var(--status-warning); }
+.gauge-danger { stroke: var(--status-danger); }
 
 .gauge-text {
   position: absolute;
@@ -161,55 +183,57 @@
 }
 
 .gauge-value {
-  font-size: 2.5rem;
-  font-weight: 800;
+  font-size: 32px;
+  font-weight: 500;
   line-height: 1;
-  letter-spacing: -0.05em;
+  letter-spacing: -0.02em;
 }
 
 .gauge-label {
-  font-size: 0.75rem;
+  font-family: var(--font-mono);
+  font-size: 10px;
   color: var(--text-secondary);
   text-transform: uppercase;
   letter-spacing: 0.1em;
   margin-top: 4px;
 }
 
-/* Risk Badge Styles */
+/* Risk Badge Styles - Flat, No glow */
 .risk-badge {
   display: inline-flex;
   align-items: center;
   gap: 8px;
-  padding: 6px 14px;
-  border-radius: 999px;
-  font-weight: 600;
-  font-size: 0.85rem;
-  letter-spacing: 0.02em;
+  padding: 6px 12px;
+  border-radius: 6px;
+  font-family: var(--font-mono);
+  font-size: 11px;
+  font-weight: 400;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
 }
 
 .risk-low {
-  background: rgba(16, 185, 129, 0.15);
+  background: rgba(36, 180, 126, 0.1);
   color: var(--status-success);
-  border: 1px solid rgba(16, 185, 129, 0.3);
+  border: 1px solid rgba(36, 180, 126, 0.25);
 }
 
 .risk-medium {
-  background: rgba(245, 158, 11, 0.15);
+  background: rgba(245, 158, 11, 0.1);
   color: var(--status-warning);
-  border: 1px solid rgba(245, 158, 11, 0.3);
+  border: 1px solid rgba(245, 158, 11, 0.25);
 }
 
 .risk-high {
-  background: rgba(239, 68, 68, 0.15);
-  color: #fca5a5;
-  border: 1px solid rgba(239, 68, 68, 0.3);
+  background: rgba(255, 77, 77, 0.1);
+  color: var(--status-danger);
+  border: 1px solid rgba(255, 77, 77, 0.25);
 }
 
 .risk-critical {
   background: var(--status-danger);
-  color: #ffffff;
+  color: var(--bg-primary);
   border: 1px solid var(--status-danger);
-  box-shadow: 0 0 20px rgba(239, 68, 68, 0.4);
 }
 
 @media (max-width: 900px) {
