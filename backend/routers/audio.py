@@ -5,6 +5,8 @@ from models.schemas import AnalysisResult, ContentType
 from analyzers.audio_analyzer import audio_analyzer
 from core.trust_score import trust_engine
 from datetime import datetime
+from core.config import settings
+from core.upload_validation import validate_media
 
 router = APIRouter(prefix="/api/analyze", tags=["Audio Analysis"])
 
@@ -18,6 +20,7 @@ async def analyze_audio(file: UploadFile = File(...)):
 
     # Read file bytes
     audio_bytes = await file.read()
+    validate_media(file, audio_bytes, settings.ALLOWED_AUDIO_TYPES, 20)
 
     # Run audio analysis
     aud_details, aud_context = audio_analyzer.analyze(audio_bytes, file.filename or "")

@@ -206,13 +206,13 @@ class TrustScoreEngine:
 
         # Summary line
         if risk_level == RiskLevel.CRITICAL:
-            summary = f"⚠️ CRITICAL: This {content_type} shows strong signs of manipulation or deception. Authenticity: {authenticity_score}%"
+            summary = f"CRITICAL: This {content_type} shows strong signs of manipulation or deception. Authenticity: {authenticity_score}%"
         elif risk_level == RiskLevel.HIGH:
-            summary = f"🔴 HIGH RISK: This {content_type} contains elements that appear manipulated or AI-generated. Authenticity: {authenticity_score}%"
+            summary = f"HIGH RISK: This {content_type} contains elements that appear manipulated or AI-generated. Authenticity: {authenticity_score}%"
         elif risk_level == RiskLevel.MEDIUM:
-            summary = f"🟡 MODERATE: This {content_type} has some suspicious indicators worth reviewing. Authenticity: {authenticity_score}%"
+            summary = f"MODERATE: This {content_type} has some suspicious indicators worth reviewing. Authenticity: {authenticity_score}%"
         else:
-            summary = f"🟢 LOW RISK: This {content_type} appears largely authentic. Authenticity: {authenticity_score}%"
+            summary = f"LOW RISK: This {content_type} appears largely authentic. Authenticity: {authenticity_score}%"
 
         # Build detailed explanation
         explanation_parts = []
@@ -251,11 +251,11 @@ class TrustScoreEngine:
         # Add each finding
         for detail in sorted_details:
             severity_icon = {
-                RiskLevel.LOW: "✅",
-                RiskLevel.MEDIUM: "⚡",
-                RiskLevel.HIGH: "🔴",
-                RiskLevel.CRITICAL: "⚠️",
-            }.get(detail.severity, "•")
+                RiskLevel.LOW: "[LOW]",
+                RiskLevel.MEDIUM: "[MEDIUM]",
+                RiskLevel.HIGH: "[HIGH]",
+                RiskLevel.CRITICAL: "[CRITICAL]",
+            }.get(detail.severity, "[INFO]")
             explanation_parts.append(
                 f"{severity_icon} [{detail.category}] {detail.finding} (confidence: {detail.confidence:.0%})"
             )

@@ -5,6 +5,7 @@ from collections import Counter
 from typing import List, Tuple
 from models.schemas import AnalysisDetail, RiskLevel
 from core.groq_client import groq_client
+from core.config import settings
 
 
 class TextAnalyzer:
@@ -282,7 +283,7 @@ Text to analyze:
         try:
             response = groq_client.chat.completions.create(
                 messages=[{"role": "user", "content": prompt}],
-                model="llama-3.3-70b-versatile",
+                model=settings.GROQ_MODEL,
                 response_format={"type": "json_object"},
                 temperature=0.1,
                 max_tokens=1500,

@@ -5,6 +5,7 @@ import json
 from typing import List, Tuple
 from models.schemas import AnalysisDetail, RiskLevel
 from core.groq_client import groq_client
+from core.config import settings
 
 
 class RAGVerifier:
@@ -62,7 +63,7 @@ Be rigorous: if the context doesn't directly address the claim, use "uncertain" 
                 try:
                     response = groq_client.chat.completions.create(
                         messages=[{"role": "user", "content": prompt}],
-                        model="llama-3.3-70b-versatile",
+                        model=settings.GROQ_MODEL,
                         response_format={"type": "json_object"},
                         temperature=0.0,
                         max_tokens=300,

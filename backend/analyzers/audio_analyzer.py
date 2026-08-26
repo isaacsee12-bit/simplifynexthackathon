@@ -104,6 +104,7 @@ class AudioAnalyzer:
 
     def _load_audio(self, audio_bytes: bytes, fmt: str):
         """Load audio bytes into numpy array using librosa."""
+        tmp_path = None
         try:
             # Write to temp file since librosa works with file paths
             suffix_map = {

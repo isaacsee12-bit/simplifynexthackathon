@@ -5,6 +5,7 @@ class Settings:
     APP_NAME: str = "TruthLens AI"
     APP_VERSION: str = "1.0.0"
     APP_DESCRIPTION: str = "Multimodal Content Verification System"
+    GROQ_MODEL: str = os.environ.get("GROQ_MODEL", "llama-3.1-8b-instant")
     
     # Server
     HOST: str = os.environ.get("HOST", "0.0.0.0")
@@ -20,8 +21,8 @@ class Settings:
     # File upload limits
     MAX_UPLOAD_SIZE_MB: int = 100
     ALLOWED_IMAGE_TYPES: list = ["image/jpeg", "image/png", "image/webp", "image/gif", "image/bmp"]
-    ALLOWED_VIDEO_TYPES: list = ["video/mp4", "video/avi", "video/mov", "video/webm", "video/mkv"]
-    ALLOWED_AUDIO_TYPES: list = ["audio/mpeg", "audio/wav", "audio/ogg", "audio/flac", "audio/mp3"]
+    ALLOWED_VIDEO_TYPES: list = ["video/mp4", "video/avi", "video/mov", "video/quicktime", "video/webm", "video/mkv"]
+    ALLOWED_AUDIO_TYPES: list = ["audio/mpeg", "audio/wav", "audio/x-wav", "audio/ogg", "audio/flac", "audio/mp3", "audio/mp4", "audio/aac"]
     
     # Analysis
     VIDEO_FRAME_SAMPLE_RATE: int = 5  # Analyze every Nth frame

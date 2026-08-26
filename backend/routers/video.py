@@ -5,6 +5,8 @@ from models.schemas import AnalysisResult, ContentType
 from analyzers.video_analyzer import video_analyzer
 from core.trust_score import trust_engine
 from datetime import datetime
+from core.config import settings
+from core.upload_validation import validate_media
 
 router = APIRouter(prefix="/api/analyze", tags=["Video Analysis"])
 
@@ -18,6 +20,7 @@ async def analyze_video(file: UploadFile = File(...)):
 
     # Read file bytes
     video_bytes = await file.read()
+    validate_media(file, video_bytes, settings.ALLOWED_VIDEO_TYPES, 50)
 
     # Run video analysis
     vid_details, vid_context = video_analyzer.analyze(video_bytes, file.filename or "")

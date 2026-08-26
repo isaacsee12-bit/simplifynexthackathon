@@ -8,6 +8,8 @@ from analyzers.text_analyzer import text_analyzer
 from analyzers.rag_verifier import rag_verifier
 from core.trust_score import trust_engine
 from datetime import datetime
+from core.config import settings
+from core.upload_validation import validate_media
 
 router = APIRouter(prefix="/api/analyze", tags=["Image Analysis"])
 
@@ -22,6 +24,7 @@ async def analyze_image(file: UploadFile = File(...)):
 
     # Read file bytes
     image_bytes = await file.read()
+    validate_media(file, image_bytes, settings.ALLOWED_IMAGE_TYPES, 15)
 
     # Run image analysis
     img_details, img_context = image_analyzer.analyze(image_bytes, file.filename or "")
