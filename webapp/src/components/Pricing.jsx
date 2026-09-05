@@ -8,7 +8,7 @@ const Pricing = ({ onTryFree }) => {
         <div className="section-stamp">Unlimited Verification</div>
         <h2>PRICING PLANS</h2>
         <p className="lead-text">
-          TruthLens AI is a free tool designed to make media verification accessible to everyone. 
+          VerifyAI is a free tool designed to make media verification accessible to everyone.
           No subscription required, no hidden credit card captures.
         </p>
       </div>
@@ -43,7 +43,7 @@ const Pricing = ({ onTryFree }) => {
             <span className="amount">OPEN</span>
             <span className="period">SOURCE</span>
           </div>
-          <p className="plan-desc">For developers and teams wishing to run TruthLens AI locally.</p>
+          <p className="plan-desc">For developers and teams wishing to run VerifyAI locally.</p>
           <ul className="plan-features">
             <li>✓ Fully Local Execution</li>
             <li>✓ Swagger/OpenAPI Specs</li>

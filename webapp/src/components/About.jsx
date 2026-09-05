@@ -8,7 +8,7 @@ const About = () => {
         <div className="section-stamp">Technical Documentation</div>
         <h2>SYSTEM ARCHITECTURE</h2>
         <p className="lead-text">
-          TruthLens AI is a high-performance, multimodal content verification system. 
+          VerifyAI is a high-performance, multimodal content verification system. 
           It orchestrates deep learning models, heuristic analyzers, and real-time retrieval-augmented generation (RAG) pipelines 
           to identify synthetic media, manipulation signatures, and phishing attacks.
         </p>

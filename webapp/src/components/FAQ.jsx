@@ -6,14 +6,14 @@ const FAQ = ({ type = 'home' }) => {
     home: [
       {
         q: "What is deepfake detection?",
-        a: "Deepfake detection is the process of identifying AI-generated or digitally manipulated content—like fake images, videos, or voices—that are made to look and sound real. These are created using neural networks to mimic real people. TruthLens AI uses forensics to scan for pixel-level anomalies, compression patterns, and vocal spectral details."
+        a: "Deepfake detection is the process of identifying AI-generated or digitally manipulated content—like fake images, videos, or voices—that are made to look and sound real. These are created using neural networks to mimic real people. VerifyAI uses forensics to scan for pixel-level anomalies, compression patterns, and vocal spectral details."
       },
       {
         q: "How does the image detector work?",
-        a: "TruthLens AI processes uploaded images through a series of tests: Error Level Analysis (ELA) to find splicing, Laplacian filter variance to detect skin anomalies, and metadata audits to locate known generator parameters."
+        a: "VerifyAI processes uploaded images through a series of tests: Error Level Analysis (ELA) to find splicing, Laplacian filter variance to detect skin anomalies, and metadata audits to locate known generator parameters."
       },
       {
-        q: "Is TruthLens AI completely free?",
+        q: "Is VerifyAI completely free?",
         a: "Yes, our web application is free to use. There are no credit cards required, no hidden paywalls, and no subscription packages."
       },
       {
@@ -28,7 +28,7 @@ const FAQ = ({ type = 'home' }) => {
       },
       {
         q: "Is the image deepfake detector 100% accurate?",
-        a: "No detector is perfect, but TruthLens AI uses a multi-layered verification system (ELA, face skin variance, noise levels, frequency analysis) that yields highly accurate results."
+        a: "No detector is perfect, but VerifyAI uses a multi-layered verification system (ELA, face skin variance, noise levels, frequency analysis) that yields highly accurate results."
       },
       {
         q: "What image formats are supported?",
@@ -78,7 +78,7 @@ const FAQ = ({ type = 'home' }) => {
         <div className="section-stamp">Common Queries</div>
         <h2>FREQUENTLY ASKED QUESTIONS</h2>
         <p>
-          Get quick answers on how TruthLens AI handles media analysis, accuracy, and data security.
+          Get quick answers on how VerifyAI handles media analysis, accuracy, and data security.
         </p>
       </div>
 

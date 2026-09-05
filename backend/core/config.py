@@ -2,7 +2,7 @@ import os
 
 # Backend configuration
 class Settings:
-    APP_NAME: str = "TruthLens AI"
+    APP_NAME: str = "VerifyAI"
     APP_VERSION: str = "1.0.0"
     APP_DESCRIPTION: str = "Multimodal Content Verification System"
     GROQ_MODEL: str = os.environ.get("GROQ_MODEL", "llama-3.1-8b-instant")

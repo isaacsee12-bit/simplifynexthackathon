@@ -7,7 +7,7 @@ const Footer = ({ onChangePage, onSelectTool }) => {
       <div className="container footer-container">
         <div className="footer-brand">
           <div className="footer-logo">
-            <span>TRUTHLENS <span className="logo-accent">AI</span></span>
+            <span>VERIFY<span className="logo-accent">AI</span></span>
           </div>
           <span className="footer-tagline">Multimodal Content Verification</span>
         </div>
@@ -37,7 +37,7 @@ const Footer = ({ onChangePage, onSelectTool }) => {
         </div>
       </div>
       <div className="footer-bottom container">
-        <p>© 2026 TruthLens AI. All rights reserved. Free content authenticity tool.</p>
+        <p>© 2026 VerifyAI. All rights reserved. Free content authenticity tool.</p>
       </div>
     </footer>
   );

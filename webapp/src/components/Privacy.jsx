@@ -8,7 +8,7 @@ const Privacy = () => {
       <p>Last updated: October 2023</p>
       
       <h3>1. Information We Collect</h3>
-      <p>We collect information that you provide directly to us when you use the TruthLens AI platform. This may include uploaded media files, text inputs, and usage logs required for verification analysis.</p>
+      <p>We collect information that you provide directly to us when you use the VerifyAI platform. This may include uploaded media files, text inputs, and usage logs required for verification analysis.</p>
 
       <h3>2. How We Use Your Information</h3>
       <p>We use the information we collect primarily to provide, maintain, and improve our multimodal content verification services. Uploaded content is processed temporarily for analysis and is not stored permanently unless explicitly opted-in by the user for model training.</p>

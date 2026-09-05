@@ -75,7 +75,7 @@ const DifferentDeepfakes = () => {
         <div className="section-stamp">Visual Verification</div>
         <h2>DIFFERENT DEEPFAKE SCANS</h2>
         <p>
-          Whether for research, profile verification, or security checks, here is how the TruthLens AI detection pipeline identifies various forms of synthetic manipulation.
+          Whether for research, profile verification, or security checks, here is how the VerifyAI detection pipeline identifies various forms of synthetic manipulation.
         </p>
       </div>
 

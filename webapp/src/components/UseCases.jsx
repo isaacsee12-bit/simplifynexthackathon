@@ -5,7 +5,7 @@ const UseCases = () => {
   const cases = [
     {
       title: "Teachers Spotting Fake Historical Photos",
-      description: "History educators utilize TruthLens AI to demonstrate digital verification methods in classrooms. By uploading viral historical pictures, students see how metadata checks and visual analysis separate authentic history from doctored representations, raising media literacy.",
+      description: "History educators utilize VerifyAI to demonstrate digital verification methods in classrooms. By uploading viral historical pictures, students see how metadata checks and visual analysis separate authentic history from doctored representations, raising media literacy.",
       icon: "🎓"
     },
     {
@@ -20,7 +20,7 @@ const UseCases = () => {
     },
     {
       title: "Families Checking Deepfake Scam Calls",
-      description: "With synthetic voice cloning on the rise, parents use TruthLens AI to verify suspicious distress voice notes. Detecting unnatural voice spectral patterns offers families quick peace of mind against digital kidnapping scams.",
+      description: "With synthetic voice cloning on the rise, parents use VerifyAI to verify suspicious distress voice notes. Detecting unnatural voice spectral patterns offers families quick peace of mind against digital kidnapping scams.",
       icon: "🛡️"
     }
   ];

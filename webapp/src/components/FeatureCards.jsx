@@ -41,7 +41,7 @@ const FeatureCards = () => {
         <div className="section-stamp">Forensic Capabilities</div>
         <h2>DETECTION PIPELINE</h2>
         <p>
-          TruthLens AI orchestrates multiple specialized models to evaluate truth across every dimension of digital media.
+          VerifyAI orchestrates multiple specialized models to evaluate truth across every dimension of digital media.
         </p>
       </div>
 

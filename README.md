@@ -1,6 +1,6 @@
-# TruthLens AI — "See through the lies."
+# VerifyAI — "See through the lies."
 
-TruthLens AI is a **Multimodal Content Verification System** designed to detect deepfakes, AI-generated content, fake messages, and cloned voices. It provides a unified pipeline that analyzes text, images, videos, and audio to determine authenticity and explain the reasoning behind its assessment.
+VerifyAI is a **Multimodal Content Verification System** designed to detect deepfakes, AI-generated content, fake messages, and cloned voices. It provides a unified pipeline that analyzes text, images, videos, and audio to determine authenticity and explain the reasoning behind its assessment.
 
 The system is built as an ecosystem consisting of two main components:
 1. **FastAPI Backend (Python)** - The core AI analysis pipeline.

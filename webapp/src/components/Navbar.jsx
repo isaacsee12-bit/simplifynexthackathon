@@ -15,7 +15,7 @@ const Navbar = ({ currentPage, onChangePage, onSelectTool }) => {
     <nav className="navbar">
       <div className="navbar-container">
         <div className="navbar-logo" onClick={() => onChangePage('home')} style={{ cursor: 'pointer' }}>
-          <span className="logo-text">TRUTHLENS <span className="logo-accent">AI</span></span>
+          <span className="logo-text">VERIFY<span className="logo-accent">AI</span></span>
         </div>
         <div className="navbar-links">
           <button 

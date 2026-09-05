@@ -154,7 +154,7 @@ Be rigorous: if the context doesn't directly address the claim, use "uncertain" 
                 return None
             query = urllib.parse.quote(" ".join(words))
             url = f"https://en.wikipedia.org/w/api.php?action=query&list=search&srsearch={query}&utf8=&format=json&srlimit=1"
-            req = urllib.request.Request(url, headers={'User-Agent': 'TruthLens/2.0'})
+            req = urllib.request.Request(url, headers={'User-Agent': 'VerifyAI/2.0'})
 
             with urllib.request.urlopen(req, timeout=3.0) as response:
                 data = json.loads(response.read().decode())
@@ -173,7 +173,7 @@ Be rigorous: if the context doesn't directly address the claim, use "uncertain" 
                 return None
             query = urllib.parse.quote(" ".join(words))
             url = f"https://api.duckduckgo.com/?q={query}&format=json&no_redirect=1&no_html=1"
-            req = urllib.request.Request(url, headers={'User-Agent': 'TruthLens/2.0'})
+            req = urllib.request.Request(url, headers={'User-Agent': 'VerifyAI/2.0'})
 
             with urllib.request.urlopen(req, timeout=3.0) as response:
                 data = json.loads(response.read().decode())
