@@ -74,9 +74,17 @@ class APITests(unittest.TestCase):
         self.assertEqual(body["content_type"], content_type)
         UUID(body["id"])
         datetime.fromisoformat(body["timestamp"])
-        self.assertGreaterEqual(body["trust_score"], 0)
-        self.assertLessEqual(body["trust_score"], 100)
-        self.assertIsInstance(body["is_authentic"], bool)
+        if content_type == "text" and body["verdict"] != "inconclusive":
+            self.assertGreaterEqual(body["trust_score"], 0)
+            self.assertLessEqual(body["trust_score"], 100)
+            self.assertIsInstance(body["is_authentic"], bool)
+        else:
+            self.assertIsNone(body["trust_score"])
+            self.assertIsNone(body["is_authentic"])
+            self.assertIsNone(body["risk_level"])
+            self.assertEqual(body["verdict"], "inconclusive")
+            if content_type != "text":
+                self.assertEqual(body["provenance"][0]["status"], "not_configured")
         self.assertTrue(body["summary"])
         self.assertTrue(body["explanation"])
         self.assertGreaterEqual(body["processing_time_ms"], 0)
@@ -193,6 +201,10 @@ class APITests(unittest.TestCase):
                         })
                     body = self.assert_result(response, "text")
                     self.assertEqual(body["claims_verified"], 0)
+                    if is_rag:
+                        self.assertIsNone(body["trust_score"])
+                        self.assertIsNone(body["risk_level"])
+                        self.assertEqual(body["verdict"], "inconclusive")
                     self.assertTrue(any(
                         "unavailable" in detail["finding"] for detail in body["details"]
                     ))
@@ -209,6 +221,18 @@ class APITests(unittest.TestCase):
         self.assertTrue(any("not configured" in d["finding"] for d in body["details"]))
         self.assertTrue(any("Claim unverified" in d["finding"] for d in body["details"]))
         self.wikipedia.assert_called_once()
+
+    def test_missing_retrieval_is_not_a_flagged_claim(self):
+        self.wikipedia.return_value = None
+        self.duckduckgo.side_effect = None
+        self.duckduckgo.return_value = None
+        body = self.assert_result(self.client.post("/api/analyze/text", json={
+            "text": self.text, "check_ai_generated": False, "check_scam": False,
+        }), "text")
+        self.assertEqual(body["claims_flagged"], 0)
+        self.assertEqual(body["verdict"], "inconclusive")
+        self.duckduckgo.assert_called_once()
+        self.duckduckgo.reset_mock()
 
     def test_real_png_image(self):
         buffer = io.BytesIO()
@@ -258,10 +282,10 @@ class APITests(unittest.TestCase):
         self.assertEqual(body["total_frames"], count)
         self.assertEqual(len(body["frame_analyses"]), count)
         self.assertEqual([f["frame_number"] for f in body["frame_analyses"]], list(range(count)))
-        self.assertEqual(body["deepfake_frames"], sum(f["is_deepfake"] for f in body["frame_analyses"]))
+        self.assertIsNone(body["deepfake_frames"])
         for frame in body["frame_analyses"]:
-            self.assertGreaterEqual(frame["deepfake_probability"], 0)
-            self.assertLessEqual(frame["deepfake_probability"], 1)
+            self.assertIsNone(frame["deepfake_probability"])
+            self.assertIsNone(frame["is_deepfake"])
             self.assertTrue(frame["details"])
 
     def test_invalid_media_upload_types(self):

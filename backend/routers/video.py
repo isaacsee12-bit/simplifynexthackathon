@@ -1,9 +1,11 @@
 import uuid
 import time
+import asyncio
+from google.genai import types
 from fastapi import APIRouter, UploadFile, File
-from models.schemas import AnalysisResult, ContentType
+from models.schemas import AnalysisResult, ContentType, AnalysisCoverage
+from analyzers.media_analyzer import request_gemini, media_assessment
 from analyzers.video_analyzer import video_analyzer
-from core.trust_score import trust_engine
 from datetime import datetime
 from core.config import settings
 from core.upload_validation import validate_media
@@ -23,21 +25,21 @@ async def analyze_video(file: UploadFile = File(...)):
     validate_media(file, video_bytes, settings.ALLOWED_VIDEO_TYPES, 50)
 
     # Run video analysis
-    vid_details, vid_context = video_analyzer.analyze(video_bytes, file.filename or "")
-
-    # Calculate trust score
-    trust_score = trust_engine.calculate_trust_score(vid_details)
-    risk_level = trust_engine.determine_risk_level(trust_score, vid_details)
-    is_authentic = trust_engine.determine_authenticity(trust_score, risk_level)
-
-    # Generate explanation with video-specific context
-    summary, explanation = trust_engine.generate_explanation(
-        "video", trust_score, risk_level, vid_details,
-        extra_context={
-            "total_frames": vid_context.get("total_frames_estimated", 0),
-            "deepfake_frames": vid_context.get("deepfake_frames_sampled", 0),
-        }
+    local_start = time.perf_counter()
+    vid_details, vid_context = await asyncio.to_thread(video_analyzer.analyze, video_bytes, file.filename or "")
+    local_ms = (time.perf_counter() - local_start) * 1000
+    frames = vid_context.pop("media_frames", [])
+    parts = []
+    for timestamp, jpeg in frames:
+        parts.extend([types.Part.from_text(text=f"Video frame at {timestamp:.3f} seconds"),
+                      types.Part.from_bytes(data=jpeg, mime_type="image/jpeg")])
+    coverage = AnalysisCoverage(
+        description="Up to 15 evenly spaced timestamped frames, resized to at most 768 pixels. No video audio, continuous motion, or unsampled frames analyzed by Gemini.",
+        media_duration_seconds=vid_context.get("duration_seconds") or None,
+        total_frames=vid_context.get("total_frames_estimated"),
+        frame_timestamps_seconds=[timestamp for timestamp, _ in frames], media_parts=len(frames),
     )
+    report = await request_gemini(parts, coverage)
 
     processing_time = (time.time() - start_time) * 1000
 
@@ -45,11 +47,7 @@ async def analyze_video(file: UploadFile = File(...)):
         id=str(uuid.uuid4()),
         content_type=ContentType.VIDEO,
         timestamp=datetime.utcnow().isoformat(),
-        trust_score=trust_score,
-        risk_level=risk_level,
-        is_authentic=is_authentic,
-        summary=summary,
-        explanation=explanation,
+        **media_assessment(report, coverage.model_copy(update={"submitted": False, "description": "Sampled-frame temporal and container heuristics; optional neural detector. No full-video verification."}), local_ms, vid_details),
         details=vid_details,
         total_frames=vid_context.get("total_frames_estimated"),
         deepfake_frames=vid_context.get("deepfake_frames_sampled"),

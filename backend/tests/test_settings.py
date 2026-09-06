@@ -170,11 +170,11 @@ class SettingsTests(unittest.TestCase):
         with patch.object(settings, "GEMINI_API_KEY", self.secret), \
                 patch.object(gemini_provider, "gemini_client", self.sdk):
             for name, address, headers, vercel in cases:
-                for method in ("GET", "PUT", "DELETE"):
+                for method in ("GET", "PUT", "DELETE", "POST"):
                     with self.subTest(guard=name, method=method), \
                             patch.dict(os.environ, {"VERCEL": vercel}):
                         self.wrapper.client = address
-                        request = self.client.build_request(method, self.endpoint, headers=headers,
+                        request = self.client.build_request(method, self.endpoint + ("/test" if method == "POST" else ""), headers=headers,
                             json={"api_key": self.secret, "model": self.model} if method == "PUT" else None)
                         if name == "missing header":
                             del request.headers["x-verifyai-settings"]
@@ -185,6 +185,38 @@ class SettingsTests(unittest.TestCase):
                         self.assertEqual(settings.GEMINI_MODEL, "gemini-offline-original")
                         self.assertIs(gemini_provider.gemini_client, self.sdk)
         self.constructor.assert_not_called()
+
+    def test_connection_uses_saved_client_and_model(self):
+        self.configure()
+        self.sdk.models.generate_content.return_value = SimpleNamespace(text="OK", candidates=[], prompt_feedback=None)
+        response = self.client.post(self.endpoint + "/test")
+        self.assertEqual(response.status_code, 200)
+        body = response.json()
+        self.assertEqual(body["status"], "completed")
+        self.assertEqual(body["model"], self.model)
+        self.assertTrue(body["coverage"]["submitted"])
+        kwargs = self.sdk.models.generate_content.call_args.kwargs
+        self.assertEqual(kwargs["model"], self.model)
+        self.assertEqual(kwargs["contents"], ["Reply with exactly OK."])
+        self.assertLessEqual(kwargs["config"].max_output_tokens, 128)
+        self.assertNotIn(self.secret, response.text + str(kwargs))
+
+    def test_connection_without_key_sends_nothing(self):
+        response = self.client.post(self.endpoint + "/test")
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.json()["status"], "not_configured")
+        self.assertFalse(response.json()["coverage"]["submitted"])
+        self.sdk.models.generate_content.assert_not_called()
+
+    def test_connection_failures_are_sanitized(self):
+        self.configure()
+        for response_text, failure, expected in [("unexpected", None, "invalid_response"),
+                                                 (None, RuntimeError(self.secret), "provider_error")]:
+            self.sdk.models.generate_content.return_value = SimpleNamespace(text=response_text, candidates=[], prompt_feedback=None)
+            self.sdk.models.generate_content.side_effect = failure
+            response = self.client.post(self.endpoint + "/test")
+            self.assertEqual(response.json()["status"], expected)
+            self.assertNotIn(self.secret, response.text)
 
     def test_invalid_model_does_not_leak_submitted_key_or_mutate_settings(self):
         for model in ("", "bad model", "bad\nmodel", "x" * 201):

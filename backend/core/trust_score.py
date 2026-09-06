@@ -171,6 +171,7 @@ class TrustScoreEngine:
     @staticmethod
     def determine_risk_level(trust_score: float, details: List[AnalysisDetail]) -> RiskLevel:
         """Determine risk level based on trust score and severity of findings."""
+        details = [d for d in details if TrustScoreEngine._normalize_category(d.category) != "system_error"]
         critical_findings = sum(1 for d in details if d.severity == RiskLevel.CRITICAL)
         high_findings = sum(1 for d in details if d.severity == RiskLevel.HIGH)
 
@@ -202,23 +203,21 @@ class TrustScoreEngine:
         Returns (summary, full_explanation).
         """
         extra_context = extra_context or {}
-        authenticity_score = round(100 - trust_score, 1)
 
         # Summary line
         if risk_level == RiskLevel.CRITICAL:
-            summary = f"CRITICAL: This {content_type} shows strong signs of manipulation or deception. Authenticity: {authenticity_score}%"
+            summary = f"CRITICAL: Several indicators in this {content_type} need review; these checks are not proof of manipulation."
         elif risk_level == RiskLevel.HIGH:
-            summary = f"HIGH RISK: This {content_type} contains elements that appear manipulated or AI-generated. Authenticity: {authenticity_score}%"
+            summary = f"HIGH RISK: This {content_type} contains suspicious indicators requiring verification."
         elif risk_level == RiskLevel.MEDIUM:
-            summary = f"MODERATE: This {content_type} has some suspicious indicators worth reviewing. Authenticity: {authenticity_score}%"
+            summary = f"MODERATE: This {content_type} has some indicators worth reviewing."
         else:
-            summary = f"LOW RISK: This {content_type} appears largely authentic. Authenticity: {authenticity_score}%"
+            summary = f"LOW INDICATOR SCORE: These checks do not establish the authenticity of this {content_type}."
 
         # Build detailed explanation
         explanation_parts = []
         explanation_parts.append(
-            f"My analysis indicates that your {content_type} "
-            f"{'contains manipulated elements' if trust_score >= 50 else 'appears largely authentic'}."
+            "Reported indicators are not calibrated probabilities or forensic conclusions."
         )
         explanation_parts.append("")
         explanation_parts.append(f"Here's what my analysis of your {content_type} revealed:")
@@ -261,7 +260,7 @@ class TrustScoreEngine:
             )
 
         explanation_parts.append("")
-        explanation_parts.append(f"Authenticity Score: {authenticity_score}%")
+        explanation_parts.append(f"Uncalibrated indicator score: {trust_score}/100 (higher means more indicators, not a probability).")
 
         return summary, "\n".join(explanation_parts)
 

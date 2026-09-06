@@ -1,5 +1,6 @@
 import uuid
 import time
+import asyncio
 from fastapi import APIRouter
 from models.schemas import AnalysisResult, TextAnalysisRequest, ContentType
 from analyzers.text_analyzer import text_analyzer
@@ -20,14 +21,14 @@ async def analyze_text(request: TextAnalysisRequest):
 
     # Run text analysis
     if request.check_ai_generated or request.check_scam:
-        text_details, text_context = text_analyzer.analyze(request.text)
+        text_details, text_context = await asyncio.to_thread(text_analyzer.analyze, request.text)
         all_details.extend(text_details)
 
     # Run claim verification
     claims_verified = 0
     claims_flagged = 0
     if request.check_claims:
-        claim_details, claim_context = rag_verifier.verify_claims(request.text)
+        claim_details, claim_context = await asyncio.to_thread(rag_verifier.verify_claims, request.text)
         all_details.extend(claim_details)
         claims_verified = claim_context.get("claims_verified", 0)
         claims_flagged = claim_context.get("claims_flagged", 0)
@@ -41,6 +42,12 @@ async def analyze_text(request: TextAnalysisRequest):
     summary, explanation = trust_engine.generate_explanation(
         "text", trust_score, risk_level, all_details
     )
+    verdict = None
+    if not any(trust_engine._normalize_category(d.category) != "system_error" for d in all_details):
+        trust_score = risk_level = is_authentic = None
+        verdict = "inconclusive"
+        summary = "Inconclusive: no content evidence was produced by the enabled checks."
+        explanation = "Disabled or unavailable checks do not establish authenticity or content risk."
 
     processing_time = (time.time() - start_time) * 1000
 
@@ -51,6 +58,7 @@ async def analyze_text(request: TextAnalysisRequest):
         trust_score=trust_score,
         risk_level=risk_level,
         is_authentic=is_authentic,
+        verdict=verdict,
         summary=summary,
         explanation=explanation,
         details=all_details,

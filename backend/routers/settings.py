@@ -7,6 +7,8 @@ from pydantic import BaseModel, Field, SecretStr
 
 from core.config import settings
 from core.gemini_client import configure_gemini
+from analyzers.media_analyzer import request_gemini
+from models.schemas import AnalysisCoverage, AnalysisProvenance
 
 
 def require_local_request(request: Request):
@@ -66,3 +68,10 @@ def update_gemini_settings(body: GeminiSettingsRequest):
 def clear_gemini_settings():
     configure_gemini("", settings.GEMINI_MODEL)
     return get_gemini_settings()
+
+
+@router.post("/gemini/test", response_model=AnalysisProvenance)
+async def test_gemini_connection():
+    return await request_gemini([], AnalysisCoverage(
+        description="Minimal text-only connection test using saved session settings. No uploaded media or key is returned.",
+    ), connection_test=True)

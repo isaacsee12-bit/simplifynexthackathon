@@ -101,7 +101,7 @@ Be rigorous: if the context doesn't directly address the claim, use "uncertain" 
                 except Exception as e:
                     print(f"Gemini RAG evaluation error: {type(e).__name__}")
                     details.append(AnalysisDetail(
-                        category="Live Web Verification",
+                        category="System Error",
                         finding=f"Claim unverified (Gemini unavailable): '{claim[:60]}...' | Context found: '{clean_snippet[:120]}...'",
                         confidence=0.6,
                         severity=RiskLevel.LOW
@@ -110,16 +110,15 @@ Be rigorous: if the context doesn't directly address the claim, use "uncertain" 
             elif snippet:
                 clean_snippet = re.sub(r'<[^>]+>', '', snippet)
                 details.append(AnalysisDetail(
-                    category="Live Web Verification",
+                    category="System Error",
                     finding=f"Claim unverified (Gemini not configured): '{claim[:60]}...' | Internet Context: '{clean_snippet[:120]}...'",
                     confidence=0.6,
                     severity=RiskLevel.LOW
                 ))
             else:
-                claims_flagged += 1
                 details.append(AnalysisDetail(
-                    category="Claim Verification",
-                    finding=f"⚠ Unverifiable: '{claim[:80]}...' — No matching internet consensus found",
+                    category="System Error",
+                    finding=f"Claim unverified: '{claim[:80]}...' - No usable retrieved context; retrieval may be unavailable.",
                     confidence=0.55,
                     severity=RiskLevel.MEDIUM
                 ))

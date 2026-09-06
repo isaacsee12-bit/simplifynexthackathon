@@ -36,6 +36,7 @@ class VideoAnalyzer:
         fmt = self._detect_format(video_bytes)
 
         frame_analyses = []
+        media_frames = []
         deepfake_count = 0
         total_frames = 0
         fps = 0
@@ -44,6 +45,7 @@ class VideoAnalyzer:
         height = 0
 
         temp_path = None
+        cap = None
 
         if HAS_CV2_AND_MODEL or cv2:
             try:
@@ -61,19 +63,26 @@ class VideoAnalyzer:
                 if total_frames > 0:
                     # 1. Sample and analyze frames with HF model
                     num_samples = min(total_frames, self.MAX_SAMPLE_FRAMES)
-                    step = max(1, total_frames // num_samples)
 
                     sampled_frames = []  # Store frames for inter-frame analysis
                     frame_brightnesses = []
                     frame_colors = []
 
                     for i in range(num_samples):
-                        frame_num = i * step
+                        frame_num = round(i * (total_frames - 1) / max(1, num_samples - 1))
                         cap.set(cv2.CAP_PROP_POS_FRAMES, frame_num)
                         ret, frame = cap.read()
 
                         if not ret:
                             continue
+
+                        if fps > 0 and np.isfinite(fps):
+                            scale = min(1, 768 / max(frame.shape[:2]))
+                            preview = cv2.resize(frame, (max(1, round(frame.shape[1] * scale)),
+                                                         max(1, round(frame.shape[0] * scale))))
+                            encoded, jpeg = cv2.imencode(".jpg", preview, [cv2.IMWRITE_JPEG_QUALITY, 85])
+                            if encoded:
+                                media_frames.append((round(frame_num / fps, 3), jpeg.tobytes()))
 
                         # Store frame data for temporal analysis
                         gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
@@ -82,7 +91,7 @@ class VideoAnalyzer:
                         sampled_frames.append(frame)
 
                         # Run HF model on frame
-                        artificial_score = 0.0
+                        artificial_score = None
                         if vision_pipeline:
                             try:
                                 img = Image.fromarray(cv2.cvtColor(frame, cv2.COLOR_BGR2RGB))
@@ -93,16 +102,16 @@ class VideoAnalyzer:
                             except Exception as e:
                                 print(f"Frame ML error: {e}")
 
-                        is_anomalous = artificial_score > 0.5
+                        is_anomalous = artificial_score > 0.5 if artificial_score is not None else None
                         if is_anomalous:
                             deepfake_count += 1
 
                         frame_analyses.append(FrameAnalysis(
                             frame_number=frame_num,
                             is_deepfake=is_anomalous,
-                            deepfake_probability=round(artificial_score, 3),
-                            details=("Neural detector unavailable; frame sampled for temporal analysis only."
-                                     if not vision_pipeline else
+                            deepfake_probability=round(artificial_score, 3) if artificial_score is not None else None,
+                            details=("Neural detector unavailable or failed; frame sampled for temporal analysis only."
+                                     if artificial_score is None else
                                      f"AI-generated features detected (score: {artificial_score:.1%})" if is_anomalous
                                      else f"Frame appears natural (score: {artificial_score:.1%})")
                         ))
@@ -122,6 +131,8 @@ class VideoAnalyzer:
             except Exception as e:
                 print(f"Video analysis error: {e}")
             finally:
+                if cap is not None:
+                    cap.release()
                 if temp_path and os.path.exists(temp_path):
                     try:
                         os.remove(temp_path)
@@ -136,7 +147,7 @@ class VideoAnalyzer:
                 confidence=1.0,
                 severity=RiskLevel.MEDIUM,
             ))
-        elif len(frame_analyses) > 0:
+        elif frame_analyses and all(f.deepfake_probability is not None for f in frame_analyses):
             deepfake_ratio = deepfake_count / len(frame_analyses)
             avg_score = np.mean([fa.deepfake_probability for fa in frame_analyses])
 
@@ -181,7 +192,7 @@ class VideoAnalyzer:
 
         extra_context = {
             "total_frames_estimated": total_frames,
-            "deepfake_frames_sampled": deepfake_count,
+            "deepfake_frames_sampled": deepfake_count if frame_analyses and all(f.is_deepfake is not None for f in frame_analyses) else None,
             "total_frames_sampled": len(frame_analyses),
             "format": fmt,
             "file_size": file_size,
@@ -189,6 +200,7 @@ class VideoAnalyzer:
             "duration_seconds": round(duration, 1),
             "resolution": f"{width}x{height}",
             "frame_analyses": frame_analyses,
+            "media_frames": media_frames,
         }
 
         return details, extra_context

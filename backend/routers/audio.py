@@ -1,9 +1,11 @@
 import uuid
 import time
+import asyncio
+from google.genai import types
 from fastapi import APIRouter, UploadFile, File
-from models.schemas import AnalysisResult, ContentType
+from models.schemas import AnalysisResult, ContentType, AnalysisCoverage
+from analyzers.media_analyzer import request_gemini, media_assessment
 from analyzers.audio_analyzer import audio_analyzer
-from core.trust_score import trust_engine
 from datetime import datetime
 from core.config import settings
 from core.upload_validation import validate_media
@@ -23,17 +25,17 @@ async def analyze_audio(file: UploadFile = File(...)):
     validate_media(file, audio_bytes, settings.ALLOWED_AUDIO_TYPES, 20)
 
     # Run audio analysis
-    aud_details, aud_context = audio_analyzer.analyze(audio_bytes, file.filename or "")
-
-    # Calculate trust score
-    trust_score = trust_engine.calculate_trust_score(aud_details)
-    risk_level = trust_engine.determine_risk_level(trust_score, aud_details)
-    is_authentic = trust_engine.determine_authenticity(trust_score, risk_level)
-
-    # Generate explanation
-    summary, explanation = trust_engine.generate_explanation(
-        "audio", trust_score, risk_level, aud_details
+    local_start = time.perf_counter()
+    aud_details, aud_context = await asyncio.to_thread(audio_analyzer.analyze, audio_bytes, file.filename or "")
+    local_ms = (time.perf_counter() - local_start) * 1000
+    sample = aud_context.pop("media_audio", None)
+    parts = [types.Part.from_bytes(data=sample, mime_type="audio/wav")] if sample else []
+    coverage = AnalysisCoverage(
+        description="Decoded opening audio sample only, capped at 60 seconds, mono PCM WAV at 22050 Hz. Remainder and speaker identity are not verified; full source duration is unknown.",
+        analyzed_duration_seconds=aud_context.get("duration_seconds") or None,
+        media_parts=len(parts),
     )
+    report = await request_gemini(parts, coverage)
 
     processing_time = (time.time() - start_time) * 1000
 
@@ -41,11 +43,7 @@ async def analyze_audio(file: UploadFile = File(...)):
         id=str(uuid.uuid4()),
         content_type=ContentType.AUDIO,
         timestamp=datetime.utcnow().isoformat(),
-        trust_score=trust_score,
-        risk_level=risk_level,
-        is_authentic=is_authentic,
-        summary=summary,
-        explanation=explanation,
+        **media_assessment(report, coverage.model_copy(update={"submitted": False, "description": "Spectral/signal checks on the opening at-most-60-second decoded sample, plus container heuristics; byte-level fallback when decoding fails."}), local_ms, aud_details),
         details=aud_details,
         processing_time_ms=round(processing_time, 1),
     )

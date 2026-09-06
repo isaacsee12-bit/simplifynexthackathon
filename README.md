@@ -25,7 +25,7 @@ Configure backend environment variables using the root `.env.example` as a refer
 
 Model availability depends on your account and the provider's current offerings. If the default is unavailable, set `GEMINI_MODEL` to a model your account can access. Never put the API key in a `VITE_` variable or frontend source: Vite variables are embedded in the public browser bundle.
 
-The backend uses Google's official `google-genai` Python SDK for text analysis and retrieved claim verification. It loads `.env` from the repository root (or `backend/.env`); existing server environment variables take precedence. Without a key, text heuristics still run and Gemini analysis is reported as unavailable. Retrieved context alone is not counted as a verified claim.
+The backend uses Google's official `google-genai` Python SDK for actual image, sampled-video-frame, and audio requests, as well as text analysis and retrieved claim verification. It loads `.env` from the repository root (or `backend/.env`); existing server environment variables take precedence. Without a key, local supplementary checks still run, but Gemini media analysis is explicitly `not_configured` and the media verdict is inconclusive. Retrieved context alone is not counted as a verified claim.
 
 Start the backend from the root:
 
@@ -53,6 +53,8 @@ Open `http://localhost:5173` using the Vite development server, or use the front
 Run the backend with a single Uvicorn worker, for example `python -m uvicorn app:app --port 8000 --workers 1`. The backend must implement `/api/settings/gemini`. If settings are unavailable, check that the backend is running and same-origin `/api` routing is working, then select **Retry loading status**. Standalone `vite preview` does not provide the development proxy.
 
 Enter a Gemini API key and model (default `gemini-3.8-flash`), then select **Save settings**. Leaving the key blank keeps the existing key, allowing model-only updates. The password field is cleared after a successful save; only configured status and model are retrieved, never the key. The frontend uses transient React state, not browser storage.
+
+Select **Test Gemini Connection** after saving. **Configured** means only that a key is present. The test makes an actual minimal text-generation request to the saved model, reports provider/model/status/duration, and may incur provider usage. A successful connection does not prove image/audio support or forensic accuracy. Unsaved input is not used. Without a key, the test returns `not_configured` without contacting Google. The test route is `POST /api/settings/gemini/test` and has the same loopback-client, loopback-host/origin, custom-header, and non-Vercel restrictions as the other settings routes. Public deployments cannot run it.
 
 **Clear session key** disables Gemini for the current backend session. It does not modify `.env` files or environment variables; those values are loaded again on restart. Session overrides live only in backend memory until restart (including development reloads). Use one worker so requests share the same session settings.
 
@@ -85,17 +87,30 @@ The generated `public/` directory is ignored by Git. There are no legacy `builds
 - Vercel Functions have a **4.5 MB request body limit**, including multipart overhead. The backend's larger upload setting does not override this limit. Large image, audio, or video uploads require a different upload/processing architecture.
 - The standard deployment does not install the Tesseract executable, so OCR is unavailable even though the Python wrapper remains installed.
 - The optional neural image model is not installed by the base requirements. When `VERCEL` is set, model initialization is skipped even if its dependencies are present, preventing startup downloads.
-- Deployed image analysis is therefore **not equivalent to a fully configured local vision installation**. Heuristic media analysis remains, but OCR and the optional neural model are absent.
+- Deployed image analysis is therefore **not equivalent to a fully configured local vision installation**. Gemini media requests work when configured and within platform limits; supplementary OCR and the optional local neural model remain absent.
 - Media dependencies remain substantial. Check the function bundle size, memory, duration, and codec support for the selected Vercel runtime and plan. Longer audio/video processing may require a dedicated worker or backend.
 - Temporary media files and the audio JIT cache use writable system temporary storage. This storage is ephemeral, not persistent.
 
 ## Analysis Overview
 
 - **Text:** Statistical and phishing indicators, with provider-backed analysis and retrieved claim verification when configured.
-- **Images:** Metadata, compression, noise, frequency, and face-related heuristics, plus the optional local neural detector and OCR when available.
-- **Video:** Sampled-frame and temporal analysis, subject to runtime and codec limitations.
-- **Audio:** Spectral and signal heuristics through the media processing dependencies.
-- **Scoring:** Findings are combined into risk levels, trust scores, and explanations. These are demonstration signals, not calibrated guarantees or forensic conclusions.
+- **Images:** Gemini receives one actual JPEG preview, resized to at most 1536 pixels on either side. Only the first frame of animated input is used; source metadata is not sent. Metadata, compression, noise, frequency, and face-related heuristics, the optional local neural detector, and OCR remain supplementary checks. OCR text is not a substitute for the image request.
+- **Video:** Gemini receives up to 15 actual JPEG frames (at most 768 pixels per side) with explicit timestamps. The same bounded sample is reused for local temporal checks; sampling spans the first through last source frame when decoding succeeds. The report lists prepared timestamps, source frame count, duration, and whether a request was attempted. **No video audio, continuous motion, or unsampled frames are analyzed by Gemini.** Decode failures can reduce coverage or prevent the request entirely.
+- **Audio:** Gemini receives real mono PCM WAV audio at 22050 Hz, reusing the decoded opening sample capped at 60 seconds. Spectral, signal, and container checks remain supplementary. Coverage reports the sample duration, not an invented full-file duration. The remainder and speaker identity are not verified. Unsupported codecs or failed decoding produce `insufficient_media`, never a text-only imitation of audio analysis.
+- **Verdicts:** Media returns `suspicious`, `no_indicators`, or `inconclusive`. `no_indicators` applies only to supplied coverage and is not an authenticity claim. Successful provider responses are schema-validated and must include limitations; a non-inconclusive verdict also requires observations. Provider output remains fallible even when valid.
+- **Scoring:** Media `trust_score`, `risk_level`, and `is_authentic` are intentionally `null`: neither Gemini observations nor local heuristics justify calibrated authenticity percentages. The frontend displays observations and limitations instead. The legacy text indicator score, when evidence exists, is explicitly uncalibrated; text checks that produce no evidence are also inconclusive. Provider/retrieval errors do not contribute to scores, risk escalation, or flagged claims. Local legacy findings retain heuristic severity/confidence fields for inspection, not as calibrated conclusions.
+
+### Provenance and Failures
+
+Media results include `provenance` entries for **Google Gemini** and **Local supplementary checks**. Each includes `provider`, `model` (null for local checks), `status`, `duration_ms`, structured `coverage`, `message`, `verdict`, `observations`, and `limitations`. Coverage distinguishes prepared media from `submitted` (a provider request was attempted, not a guarantee that the provider received or analyzed it). `completed` means a valid response, not established authenticity. Local status is conservatively `partial` because these checks cannot provide full verification.
+
+Missing credentials, insufficient decodable media, timeouts, authentication/access errors, quota errors, unavailable models, provider failures, safety blocks, and malformed/truncated output are separate statuses: `not_configured`, `insufficient_media`, `timeout`, `authentication_error`, `quota_exceeded`, `model_unavailable`, `provider_error`, `blocked`, and `invalid_response`. They produce an inconclusive verdict, not suspicious content findings. Error bodies and secrets are not returned or logged by the media/connection request handler. Check the saved model, permissions, and quota, then retry; there is no silent text-only fallback or automatic application retry.
+
+Blocking SDK and local analyzer work is offloaded from FastAPI's event loop. Gemini HTTP requests have the existing 30-second timeout plus a 35-second application wait limit; an already running SDK thread cannot be forcibly stopped when that wait expires. Local decoding/heuristics are not covered by the provider timeout. A plain SDK response schema with independent Pydantic validation is tested against installed `google-genai 1.46.0` and `pydantic 2.8.0`; no dependency upgrade is required.
+
+### Media Privacy
+
+With Gemini configured, prepared media is sent to Google. Optional extracted-text claim checks also use external retrieval services. Provider data-retention policies apply; do not submit sensitive media without permission. The app does not persist uploads, but temporary decoding files and in-memory payloads exist during processing. Session keys remain backend-memory-only, are never returned, and reset on restart. Keep local settings private and use one worker.
 
 ## Verification
 
@@ -103,6 +118,9 @@ The generated `public/` directory is ignored by Git. There are no legacy `builds
 python -c "from app import app; print(app.title)"
 npm --prefix webapp run build -- --outDir ../public --emptyOutDir
 python -m unittest discover -s backend/tests -p test_api.py
+python -m unittest discover -s backend/tests -p test_media.py
+python -m unittest discover -s backend/tests -p test_settings.py
+npm --prefix webapp run build
 ```
 
-The regression suite exercises health, text and RAG responses, all three media upload endpoints, and frontend routing. Gemini and web retrieval are mocked so tests require no credentials or network. A live Gemini request and a deployed Vercel smoke test are still needed to verify account/model access and platform limits.
+The regression suite exercises health, text and RAG responses, all media upload endpoints, frontend routing, and local settings/connection guards. Media tests inspect real decodable image/audio payloads and bounded timestamped video frames, schema validation, provider failure states, null confidence fields, off-event-loop SDK execution, and the real installed SDK's request serialization with its transport mocked. Gemini and web retrieval are mocked so tests require no credentials or network. The `public` build above is required for the API suite's Vercel routing tests; the final normal build also updates locally served `webapp/dist`. A live connection/media check with an authorized key and a deployed Vercel smoke test are still needed to verify account/model access and platform limits.

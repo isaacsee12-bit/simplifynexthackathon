@@ -1,5 +1,5 @@
-from pydantic import BaseModel
-from typing import Optional, List
+from pydantic import BaseModel, Field
+from typing import Optional, List, Literal
 from enum import Enum
 from datetime import datetime
 
@@ -37,9 +37,33 @@ class AnalysisDetail(BaseModel):
 class FrameAnalysis(BaseModel):
     """Analysis result for a single video frame."""
     frame_number: int
-    is_deepfake: bool
-    deepfake_probability: float
+    is_deepfake: Optional[bool]
+    deepfake_probability: Optional[float]
     details: str
+
+
+class AnalysisCoverage(BaseModel):
+    description: str
+    media_duration_seconds: Optional[float] = None
+    analyzed_duration_seconds: Optional[float] = None
+    frame_timestamps_seconds: List[float] = Field(default_factory=list)
+    total_frames: Optional[int] = None
+    media_parts: int = 0
+    submitted: bool = False
+
+
+class AnalysisProvenance(BaseModel):
+    provider: str
+    model: Optional[str] = None
+    status: Literal["completed", "partial", "not_configured", "insufficient_media",
+                    "timeout", "authentication_error", "quota_exceeded", "model_unavailable",
+                    "provider_error", "invalid_response", "blocked"]
+    duration_ms: float = 0
+    coverage: AnalysisCoverage
+    message: str
+    verdict: Literal["suspicious", "no_indicators", "inconclusive"] = "inconclusive"
+    observations: List[str] = Field(default_factory=list)
+    limitations: List[str] = Field(default_factory=list)
 
 
 class AnalysisResult(BaseModel):
@@ -47,9 +71,11 @@ class AnalysisResult(BaseModel):
     id: str
     content_type: ContentType
     timestamp: str
-    trust_score: float  # 0 to 100
-    risk_level: RiskLevel
-    is_authentic: bool
+    trust_score: Optional[float]  # Legacy uncalibrated indicator score, not a probability
+    risk_level: Optional[RiskLevel]
+    is_authentic: Optional[bool]
+    verdict: Optional[Literal["suspicious", "no_indicators", "inconclusive"]] = None
+    provenance: List[AnalysisProvenance] = Field(default_factory=list)
     summary: str
     explanation: str
     analysis_summary: Optional[str] = None

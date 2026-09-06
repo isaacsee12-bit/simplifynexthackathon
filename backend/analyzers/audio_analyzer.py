@@ -3,6 +3,7 @@ import struct
 import io
 import tempfile
 import os
+import wave
 import numpy as np
 from typing import List, Tuple
 from models.schemas import AnalysisDetail, RiskLevel
@@ -86,6 +87,17 @@ class AudioAnalyzer:
             "duration_seconds": round(len(audio_data) / sample_rate, 2) if audio_data is not None and sample_rate else 0,
             "librosa_available": HAS_LIBROSA,
         }
+
+        # Reuse the decoded, mono 22050 Hz, at-most-60-second local sample.
+        extra_context["media_audio"] = None
+        if audio_data is not None and sample_rate:
+            output = io.BytesIO()
+            with wave.open(output, "wb") as wav:
+                wav.setnchannels(1)
+                wav.setsampwidth(2)
+                wav.setframerate(sample_rate)
+                wav.writeframes((np.clip(audio_data, -1, 1) * 32767).astype("<i2").tobytes())
+            extra_context["media_audio"] = output.getvalue()
 
         return details, extra_context
 
