@@ -1,8 +1,13 @@
 {
   "$schema": "https://openapi.vercel.sh/vercel.json",
-  "installCommand": "cd webapp && npm ci",
-  "buildCommand": "cd webapp && npm run build",
-  "outputDirectory": "webapp/dist",
+  "framework": "fastapi",
+  "buildCommand": "npm --prefix webapp ci && npm --prefix webapp run build -- --outDir ../public --emptyOutDir",
+  "functions": {
+    "app.py": {
+      "maxDuration": 300,
+      "excludeFiles": "{backend/tests/**,backend/test_*.py,webapp/node_modules/**,webapp/src/**,.venv/**}"
+    }
+  },
   "github": {
     "autoJobCancelation": true
   }

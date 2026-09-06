@@ -1,4 +1,5 @@
 import io
+import os
 import hashlib
 import struct
 import numpy as np
@@ -11,19 +12,20 @@ try:
 except ImportError:
     HAS_PIL = False
 
-try:
-    from transformers import pipeline
-    import torch
+vision_pipeline = None
+# Avoid model downloads and heavyweight initialization in serverless functions.
+if not os.environ.get("VERCEL"):
+    try:
+        from transformers import pipeline
+        import torch
 
-    print("Loading HuggingFace Deepfake Vision model (umm-maybe/AI-image-detector)... This may take a moment.")
-    device = 0 if torch.cuda.is_available() else -1
-    vision_pipeline = pipeline("image-classification", model="umm-maybe/AI-image-detector", device=device)
-except ImportError:
-    vision_pipeline = None
-    print("Transformers or PyTorch not installed. Falling back to heuristics.")
-except Exception as e:
-    vision_pipeline = None
-    print(f"Error loading HuggingFace model: {e}. Falling back to heuristics.")
+        print("Loading HuggingFace Deepfake Vision model (umm-maybe/AI-image-detector)... This may take a moment.")
+        device = 0 if torch.cuda.is_available() else -1
+        vision_pipeline = pipeline("image-classification", model="umm-maybe/AI-image-detector", device=device)
+    except ImportError:
+        print("Transformers or PyTorch not installed. Falling back to heuristics.")
+    except Exception as e:
+        print(f"Error loading HuggingFace model: {e}. Falling back to heuristics.")
 
 try:
     import cv2

@@ -8,3 +8,6 @@ __pycache__/
 # Test results
 test_results.json
 api_test.json
+
+# Vercel frontend build output
+/public/

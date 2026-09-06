@@ -101,8 +101,10 @@ class VideoAnalyzer:
                             frame_number=frame_num,
                             is_deepfake=is_anomalous,
                             deepfake_probability=round(artificial_score, 3),
-                            details=f"AI-generated features detected (score: {artificial_score:.1%})" if is_anomalous
-                                    else f"Frame appears natural (score: {artificial_score:.1%})"
+                            details=("Neural detector unavailable; frame sampled for temporal analysis only."
+                                     if not vision_pipeline else
+                                     f"AI-generated features detected (score: {artificial_score:.1%})" if is_anomalous
+                                     else f"Frame appears natural (score: {artificial_score:.1%})")
                         ))
 
                     # 2. Inter-frame temporal consistency analysis
@@ -127,7 +129,14 @@ class VideoAnalyzer:
                         pass
 
         # 4. Report frame-level results
-        if len(frame_analyses) > 0:
+        if not vision_pipeline:
+            details.append(AnalysisDetail(
+                category="System Error",
+                finding="Neural video detector unavailable. Temporal and container analysis only; frame probabilities are not model predictions.",
+                confidence=1.0,
+                severity=RiskLevel.MEDIUM,
+            ))
+        elif len(frame_analyses) > 0:
             deepfake_ratio = deepfake_count / len(frame_analyses)
             avg_score = np.mean([fa.deepfake_probability for fa in frame_analyses])
 

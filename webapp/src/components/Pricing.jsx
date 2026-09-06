@@ -48,7 +48,7 @@ const Pricing = ({ onTryFree }) => {
             <li>✓ Fully Local Execution</li>
             <li>✓ Swagger/OpenAPI Specs</li>
             <li>✓ HuggingFace & Librosa Pipelines</li>
-            <li>✓ Groq Llama 3.3 Integration</li>
+            <li>✓ AI-powered text analysis</li>
             <li>✓ MIT License</li>
             <li>✓ Zero Third-Party Data Tracking</li>
           </ul>

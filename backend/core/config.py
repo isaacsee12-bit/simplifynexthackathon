@@ -1,11 +1,22 @@
 import os
+import tempfile
+from pathlib import Path
+from dotenv import load_dotenv
+
+load_dotenv(Path(__file__).resolve().parents[2] / ".env")
+load_dotenv(Path(__file__).resolve().parents[1] / ".env")
+
+if os.environ.get("VERCEL"):
+    # librosa/Numba must not write compiled caches into the read-only bundle.
+    os.environ.setdefault("NUMBA_CACHE_DIR", os.path.join(tempfile.gettempdir(), "verifyai_numba"))
 
 # Backend configuration
 class Settings:
     APP_NAME: str = "VerifyAI"
     APP_VERSION: str = "1.0.0"
     APP_DESCRIPTION: str = "Multimodal Content Verification System"
-    GROQ_MODEL: str = os.environ.get("GROQ_MODEL", "llama-3.1-8b-instant")
+    GEMINI_API_KEY: str = os.environ.get("GEMINI_API_KEY", "")
+    GEMINI_MODEL: str = os.environ.get("GEMINI_MODEL", "gemini-3.8-flash")
     
     # Server
     HOST: str = os.environ.get("HOST", "0.0.0.0")
@@ -29,7 +40,7 @@ class Settings:
     MAX_FRAMES_TO_ANALYZE: int = 100
     
     # Temp storage
-    TEMP_DIR: str = os.path.join(os.path.dirname(os.path.dirname(__file__)), "temp_uploads")
+    TEMP_DIR: str = os.path.join(tempfile.gettempdir(), "verifyai_uploads")
 
 settings = Settings()
 

@@ -4,14 +4,15 @@ import urllib.parse
 import json
 from typing import List, Tuple
 from models.schemas import AnalysisDetail, RiskLevel
-from core.groq_client import groq_client
+from core.gemini_client import gemini_client
+from google.genai import types
 from core.config import settings
 
 
 class RAGVerifier:
     """
     RAG-backed claim verification engine.
-    Uses Wikipedia + DuckDuckGo for context, and Groq LLM (70B) to verify claims.
+    Uses Wikipedia + DuckDuckGo for context, and Gemini to verify claims.
     """
 
     CLAIM_PATTERNS = [
@@ -44,7 +45,7 @@ class RAGVerifier:
             if not snippet:
                 snippet = self._query_duckduckgo(claim)
 
-            if snippet and groq_client:
+            if snippet and gemini_client:
                 clean_snippet = re.sub(r'<[^>]+>', '', snippet)
 
                 prompt = f"""You are a fact-checking assistant. Evaluate if the following claim is supported, refuted, or uncertain based on the provided context.
@@ -61,14 +62,16 @@ Output JSON:
 Be rigorous: if the context doesn't directly address the claim, use "uncertain" not "supported".
 """
                 try:
-                    response = groq_client.chat.completions.create(
-                        messages=[{"role": "user", "content": prompt}],
-                        model=settings.GROQ_MODEL,
-                        response_format={"type": "json_object"},
-                        temperature=0.0,
-                        max_tokens=300,
+                    response = gemini_client.models.generate_content(
+                        contents=prompt,
+                        model=settings.GEMINI_MODEL,
+                        config=types.GenerateContentConfig(
+                            response_mime_type="application/json",
+                            temperature=0.0,
+                            max_output_tokens=300,
+                        ),
                     )
-                    result = json.loads(response.choices[0].message.content)
+                    result = json.loads(response.text)
                     verdict = result.get("verdict", "uncertain").lower()
                     reasoning = result.get("reasoning", "")
 
@@ -96,21 +99,19 @@ Be rigorous: if the context doesn't directly address the claim, use "uncertain" 
                             severity=RiskLevel.MEDIUM
                         ))
                 except Exception as e:
-                    print(f"Groq RAG evaluation error: {e}")
-                    claims_verified += 1
+                    print(f"Gemini RAG evaluation error: {type(e).__name__}")
                     details.append(AnalysisDetail(
                         category="Live Web Verification",
-                        finding=f"Claim: '{claim[:60]}...' | Context found: '{clean_snippet[:120]}...'",
+                        finding=f"Claim unverified (Gemini unavailable): '{claim[:60]}...' | Context found: '{clean_snippet[:120]}...'",
                         confidence=0.6,
                         severity=RiskLevel.LOW
                     ))
 
             elif snippet:
                 clean_snippet = re.sub(r'<[^>]+>', '', snippet)
-                claims_verified += 1
                 details.append(AnalysisDetail(
                     category="Live Web Verification",
-                    finding=f"Claim: '{claim[:60]}...' | Internet Context: '{clean_snippet[:120]}...'",
+                    finding=f"Claim unverified (Gemini not configured): '{claim[:60]}...' | Internet Context: '{clean_snippet[:120]}...'",
                     confidence=0.6,
                     severity=RiskLevel.LOW
                 ))

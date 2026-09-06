@@ -1,4 +1,7 @@
-from fastapi import FastAPI
+import os
+from pathlib import Path
+
+from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from core.config import settings
 from routers import health, text, image, video, audio
@@ -29,7 +32,6 @@ app.include_router(video.router)
 app.include_router(audio.router)
 
 
-import os
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse
 
@@ -49,22 +51,31 @@ async def root():
         }
     }
 
-# Mount the frontend static files
-frontend_dist = os.path.join(os.path.dirname(os.path.dirname(__file__)), "webapp", "dist")
-if os.path.exists(frontend_dist):
-    app.mount("/assets", StaticFiles(directory=os.path.join(frontend_dist, "assets")), name="assets")
-    
-    @app.get("/{full_path:path}")
-    async def serve_frontend(full_path: str):
-        # Don't intercept API calls
-        if full_path.startswith("api/") or full_path in ["docs", "redoc", "openapi.json"]:
-            return {"detail": "Not Found"}
-            
-        requested_file = os.path.join(frontend_dist, full_path)
-        if os.path.isfile(requested_file):
-            return FileResponse(requested_file)
-            
-        return FileResponse(os.path.join(frontend_dist, "index.html"))
+# Vercel serves public assets through its CDN; only mount assets locally.
+project_root = Path(__file__).resolve().parent.parent
+is_vercel = bool(os.environ.get("VERCEL"))
+frontend_dist = (project_root / ("public" if is_vercel else "webapp/dist")).resolve()
+if not is_vercel and (frontend_dist / "assets").is_dir():
+    app.mount("/assets", StaticFiles(directory=frontend_dist / "assets"), name="assets")
+
+
+@app.get("/{full_path:path}", include_in_schema=False)
+async def serve_frontend(full_path: str):
+    requested_file = (frontend_dist / full_path).resolve()
+    if not requested_file.is_relative_to(frontend_dist):
+        raise HTTPException(status_code=404, detail="Not Found")
+
+    relative_path = requested_file.relative_to(frontend_dist).as_posix()
+    if relative_path == "api" or relative_path.startswith("api/") or relative_path in ["docs", "redoc", "openapi.json"]:
+        raise HTTPException(status_code=404, detail="Not Found")
+
+    if requested_file.is_file():
+        return FileResponse(requested_file)
+
+    index_file = frontend_dist / "index.html"
+    if not index_file.is_file():
+        raise HTTPException(status_code=404, detail="Not Found")
+    return FileResponse(index_file)
 
 
 if __name__ == "__main__":

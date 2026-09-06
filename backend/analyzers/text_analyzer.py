@@ -4,7 +4,8 @@ import math
 from collections import Counter
 from typing import List, Tuple
 from models.schemas import AnalysisDetail, RiskLevel
-from core.groq_client import groq_client
+from core.gemini_client import gemini_client
+from google.genai import types
 from core.config import settings
 
 
@@ -12,7 +13,7 @@ class TextAnalyzer:
     """
     Production-grade text forensic analyzer:
     1. Statistical text analysis (perplexity proxy, burstiness, TTR, sentence variance)
-    2. LLM-based analysis with Groq (upgraded model)
+    2. LLM-based analysis with Gemini
     3. Scam/phishing pattern detection
     4. AI-writing pattern detection
     """
@@ -38,12 +39,12 @@ class TextAnalyzer:
         self._scam_pattern_detection(text, details)
 
         # 3. LLM-based deep analysis
-        if groq_client:
+        if gemini_client:
             self._llm_analysis(text, details, stats)
         else:
             details.append(AnalysisDetail(
                 category="System Error",
-                finding="Groq API key not configured. LLM-based text analysis unavailable.",
+                finding="Gemini API key not configured. LLM-based text analysis unavailable.",
                 confidence=1.0,
                 severity=RiskLevel.CRITICAL
             ))
@@ -225,7 +226,7 @@ class TextAnalyzer:
 
     # ─── LLM Analysis ────────────────────────────────────────────────────
     def _llm_analysis(self, text: str, details: List[AnalysisDetail], stats: dict):
-        """Use Groq LLM for deep text analysis."""
+        """Use Gemini for deep text analysis."""
         prompt = f"""You are an expert AI content detection and fraud analysis system. Analyze the following text for:
 
 1. **AI Generation Detection**: Does this text appear to be written by an LLM? Look for:
@@ -281,15 +282,17 @@ Text to analyze:
 """
 
         try:
-            response = groq_client.chat.completions.create(
-                messages=[{"role": "user", "content": prompt}],
-                model=settings.GROQ_MODEL,
-                response_format={"type": "json_object"},
-                temperature=0.1,
-                max_tokens=1500,
+            response = gemini_client.models.generate_content(
+                contents=prompt,
+                model=settings.GEMINI_MODEL,
+                config=types.GenerateContentConfig(
+                    response_mime_type="application/json",
+                    temperature=0.1,
+                    max_output_tokens=1500,
+                ),
             )
 
-            result_json = json.loads(response.choices[0].message.content)
+            result_json = json.loads(response.text)
 
             for item in result_json.get("details", []):
                 sev_str = item.get("severity", "low").lower()
@@ -319,10 +322,10 @@ Text to analyze:
             stats["misinfo_score"] = float(scores.get("misinfo_score", 0.0))
 
         except Exception as e:
-            print(f"Groq API error during text analysis: {e}")
+            print(f"Gemini API error during text analysis: {type(e).__name__}")
             details.append(AnalysisDetail(
                 category="System Error",
-                finding=f"LLM analysis error: {str(e)[:100]}",
+                finding="Gemini analysis unavailable. Statistical and pattern analysis only.",
                 confidence=1.0,
                 severity=RiskLevel.MEDIUM
             ))
