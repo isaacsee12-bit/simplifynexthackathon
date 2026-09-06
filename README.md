@@ -77,7 +77,7 @@ Create a root `.env` using [`.env.example`](.env.example) as a reference, or con
 | Variable | Purpose |
 | --- | --- |
 | `GEMINI_API_KEY` | Backend-only Gemini API secret. The example intentionally contains no key. |
-| `GEMINI_MODEL` | Configurable model ID; defaults to `gemini-3.8-flash`. |
+| `GEMINI_MODEL` | Configurable model ID; defaults to `gemini-3.5-flash`. |
 | `CORS_ORIGINS` | Comma-separated allowed frontend origins; defaults to localhost and 127.0.0.1 on port 5173. Same-origin deployments need no override. |
 
 Model availability depends on your account and the provider's current offerings. If the default is unavailable, set `GEMINI_MODEL` to a model your account can access. Never put the API key in a `VITE_` variable or frontend source: Vite variables are embedded in the public browser bundle.
@@ -109,7 +109,7 @@ Open `http://localhost:5173` using the Vite development server, or use the front
 
 Run the backend with a single Uvicorn worker, for example `python -m uvicorn app:app --port 8000 --workers 1`. The backend must implement `/api/settings/gemini`. If settings are unavailable, check that the backend is running and same-origin `/api` routing is working, then select **Retry loading status**. Standalone `vite preview` does not provide the development proxy.
 
-Enter a Gemini API key and model (default `gemini-3.8-flash`), then select **Save settings**. Leaving the key blank keeps the existing key, allowing model-only updates. The password field is cleared after a successful save; only configured status and model are retrieved, never the key. The frontend uses transient React state, not browser storage.
+Enter a Gemini API key and model (default `gemini-3.5-flash`), then select **Save settings**. Leaving the key blank keeps the existing key, allowing model-only updates. The password field is cleared after a successful save; only configured status and model are retrieved, never the key. The frontend uses transient React state, not browser storage.
 
 Select **Test Gemini Connection** after saving. **Configured** means only that a key is present. The test makes an actual minimal text-generation request to the saved model, reports provider/model/status/duration, and may incur provider usage. A successful connection does not prove image/audio support or forensic accuracy. Unsaved input is not used. Without a key, the test returns `not_configured` without contacting Google. The test route is `POST /api/settings/gemini/test` and has the same loopback-client, loopback-host/origin, custom-header, and non-Vercel restrictions as the other settings routes. Public deployments cannot run it.
 

@@ -45,7 +45,7 @@ router = APIRouter(
 
 class GeminiSettingsRequest(BaseModel):
     api_key: SecretStr | None = None
-    model: str = Field(default="gemini-3.8-flash", min_length=1, max_length=200,
+    model: str = Field(default="gemini-3.5-flash", min_length=1, max_length=200,
                        pattern=r"^[A-Za-z0-9][A-Za-z0-9._/-]*$")
 
 

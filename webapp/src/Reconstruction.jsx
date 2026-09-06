@@ -12,7 +12,7 @@ const modes = {
 function ApiSettings() {
   const local = isLocalSettingsHost();
   const [configured, setConfigured] = useState(null);
-  const [model, setModel] = useState('gemini-3.8-flash');
+  const [model, setModel] = useState('gemini-3.5-flash');
   const [apiKey, setApiKey] = useState('');
   const [pending, setPending] = useState(local ? 'loading' : '');
   const [error, setError] = useState('');
@@ -60,7 +60,7 @@ function ApiSettings() {
         <input id="gemini-key" type="password" value={apiKey} onChange={(event) => setApiKey(event.target.value)} autoComplete="off" spellCheck={false} aria-describedby="gemini-key-help" placeholder="Enter a new key" />
         <p id="gemini-key-help" className="settings-help">Leave blank to keep the existing key. Cleared from this field after a successful save.</p>
         <label htmlFor="gemini-model">Model</label>
-        <input id="gemini-model" type="text" value={model} onChange={(event) => setModel(event.target.value)} required placeholder="gemini-3.8-flash" autoComplete="off" spellCheck={false} />
+        <input id="gemini-model" type="text" value={model} onChange={(event) => setModel(event.target.value)} required placeholder="gemini-3.5-flash" autoComplete="off" spellCheck={false} />
         <div className="settings-actions"><button className="scan-button" type="submit" disabled={!model.trim()}>{pending === 'saving' ? 'Saving...' : 'Save settings'}</button><button className="outline-button" type="button" onClick={() => updateSettings('clearing')}>{pending === 'clearing' ? 'Clearing...' : 'Clear session key'}</button></div>
         <button className="outline-button" type="button" onClick={() => updateSettings('testing')}>{pending === 'testing' ? 'Testing connection...' : 'Test Gemini Connection'}</button>
       </fieldset>

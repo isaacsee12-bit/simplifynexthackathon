@@ -16,7 +16,7 @@ class Settings:
     APP_VERSION: str = "1.0.0"
     APP_DESCRIPTION: str = "Multimodal Content Verification System"
     GEMINI_API_KEY: str = os.environ.get("GEMINI_API_KEY", "")
-    GEMINI_MODEL: str = os.environ.get("GEMINI_MODEL", "gemini-3.8-flash")
+    GEMINI_MODEL: str = os.environ.get("GEMINI_MODEL", "gemini-3.5-flash")
     
     # Server
     HOST: str = os.environ.get("HOST", "0.0.0.0")
