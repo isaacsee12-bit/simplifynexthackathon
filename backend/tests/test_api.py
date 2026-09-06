@@ -47,8 +47,8 @@ class APITests(unittest.TestCase):
         ))
         self.addCleanup(network.assert_not_called)
         self.addCleanup(dns.assert_not_called)
-        self.enterContext(patch.object(text_module, "gemini_client", None))
-        self.enterContext(patch.object(rag_module, "gemini_client", None))
+        self.enterContext(patch.object(text_module, "gemini_provider", SimpleNamespace(gemini_client=None)))
+        self.enterContext(patch.object(rag_module, "gemini_provider", SimpleNamespace(gemini_client=None)))
         self.wikipedia = self.enterContext(patch.object(
             rag_module.rag_verifier, "_query_wikipedia", return_value=self.context
         ))
@@ -61,8 +61,8 @@ class APITests(unittest.TestCase):
     def fake_client(self, module, payload):
         generate = Mock(return_value=SimpleNamespace(text=json.dumps(payload)))
         self.enterContext(patch.object(
-            module, "gemini_client",
-            SimpleNamespace(models=SimpleNamespace(generate_content=generate)),
+            module, "gemini_provider",
+            SimpleNamespace(gemini_client=SimpleNamespace(models=SimpleNamespace(generate_content=generate))),
         ))
         return generate
 

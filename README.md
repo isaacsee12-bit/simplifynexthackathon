@@ -46,6 +46,18 @@ Open `http://localhost:5173`. The frontend defaults to same-origin `/api`; Vite 
 
 For local production-style serving, run `npm --prefix webapp run build` and start the backend. FastAPI serves `webapp/dist` locally, including the SPA fallback. Vite's development proxy does not apply to `vite preview`.
 
+## Local API Settings
+
+Open `http://localhost:5173` using the Vite development server, or use the frontend served by the local backend. Select **API** in the navigation. Settings are enabled only for `localhost`, `127.0.0.1`, and `[::1]`; deployed and LAN hostnames send no settings requests.
+
+Run the backend with a single Uvicorn worker, for example `python -m uvicorn app:app --port 8000 --workers 1`. The backend must implement `/api/settings/gemini`. If settings are unavailable, check that the backend is running and same-origin `/api` routing is working, then select **Retry loading status**. Standalone `vite preview` does not provide the development proxy.
+
+Enter a Gemini API key and model (default `gemini-3.8-flash`), then select **Save settings**. Leaving the key blank keeps the existing key, allowing model-only updates. The password field is cleared after a successful save; only configured status and model are retrieved, never the key. The frontend uses transient React state, not browser storage.
+
+**Clear session key** disables Gemini for the current backend session. It does not modify `.env` files or environment variables; those values are loaded again on restart. Session overrides live only in backend memory until restart (including development reloads). Use one worker so requests share the same session settings.
+
+Settings requests always use same-origin `/api/settings/gemini`, ignore `VITE_API_URL`, and include `X-VerifyAI-Settings: 1`. Redirects are blocked to avoid forwarding the key elsewhere. Keep the local server private and never put secrets in frontend environment variables.
+
 ## Optional Vision
 
 The base installation retains OpenCV, Pillow, NumPy, pytesseract, librosa, soundfile, and scikit-learn. The heavyweight neural image detector is optional:

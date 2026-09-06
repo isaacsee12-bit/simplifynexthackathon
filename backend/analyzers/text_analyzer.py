@@ -4,7 +4,7 @@ import math
 from collections import Counter
 from typing import List, Tuple
 from models.schemas import AnalysisDetail, RiskLevel
-from core.gemini_client import gemini_client
+from core import gemini_client as gemini_provider
 from google.genai import types
 from core.config import settings
 
@@ -39,7 +39,7 @@ class TextAnalyzer:
         self._scam_pattern_detection(text, details)
 
         # 3. LLM-based deep analysis
-        if gemini_client:
+        if gemini_provider.gemini_client:
             self._llm_analysis(text, details, stats)
         else:
             details.append(AnalysisDetail(
@@ -282,7 +282,7 @@ Text to analyze:
 """
 
         try:
-            response = gemini_client.models.generate_content(
+            response = gemini_provider.gemini_client.models.generate_content(
                 contents=prompt,
                 model=settings.GEMINI_MODEL,
                 config=types.GenerateContentConfig(

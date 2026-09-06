@@ -5,6 +5,7 @@ from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from core.config import settings
 from routers import health, text, image, video, audio
+from routers import settings as settings_router
 
 # Create FastAPI app
 app = FastAPI(
@@ -30,6 +31,7 @@ app.include_router(text.router)
 app.include_router(image.router)
 app.include_router(video.router)
 app.include_router(audio.router)
+app.include_router(settings_router.router)
 
 
 from fastapi.staticfiles import StaticFiles

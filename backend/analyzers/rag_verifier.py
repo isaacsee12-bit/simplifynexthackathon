@@ -4,7 +4,7 @@ import urllib.parse
 import json
 from typing import List, Tuple
 from models.schemas import AnalysisDetail, RiskLevel
-from core.gemini_client import gemini_client
+from core import gemini_client as gemini_provider
 from google.genai import types
 from core.config import settings
 
@@ -45,7 +45,7 @@ class RAGVerifier:
             if not snippet:
                 snippet = self._query_duckduckgo(claim)
 
-            if snippet and gemini_client:
+            if snippet and gemini_provider.gemini_client:
                 clean_snippet = re.sub(r'<[^>]+>', '', snippet)
 
                 prompt = f"""You are a fact-checking assistant. Evaluate if the following claim is supported, refuted, or uncertain based on the provided context.
@@ -62,7 +62,7 @@ Output JSON:
 Be rigorous: if the context doesn't directly address the claim, use "uncertain" not "supported".
 """
                 try:
-                    response = gemini_client.models.generate_content(
+                    response = gemini_provider.gemini_client.models.generate_content(
                         contents=prompt,
                         model=settings.GEMINI_MODEL,
                         config=types.GenerateContentConfig(

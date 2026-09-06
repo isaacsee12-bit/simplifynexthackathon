@@ -1,6 +1,37 @@
 // API utility for communicating with the FastAPI backend
 const API_BASE_URL = import.meta.env.VITE_API_URL || '/api';
 
+export const isLocalSettingsHost = () =>
+  typeof window !== 'undefined' && ['localhost', '127.0.0.1', '[::1]'].includes(window.location.hostname);
+
+const requestGeminiSettings = async (method, body) => {
+  if (!isLocalSettingsHost()) throw new Error('API settings are available only on localhost, 127.0.0.1, or [::1].');
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), 10000);
+  try {
+    // Never use the analysis API override or follow redirects with a secret.
+    const response = await fetch('/api/settings/gemini', {
+      method,
+      headers: { 'X-VerifyAI-Settings': '1', ...(body ? { 'Content-Type': 'application/json' } : {}) },
+      body: body ? JSON.stringify(body) : undefined,
+      mode: 'same-origin', redirect: 'error', cache: 'no-store', signal: controller.signal,
+    });
+    if (!response.ok) throw new Error('Settings request failed');
+    if (method === 'GET') {
+      const data = await response.json();
+      if (typeof data.configured !== 'boolean' || typeof data.model !== 'string') throw new Error('Invalid settings response');
+      return { configured: data.configured, model: data.model };
+    }
+  } catch {
+    throw new Error('Local API settings are unavailable. Start the backend with settings support and use the Vite dev server or backend-served frontend with same-origin /api routing, then retry.');
+  } finally { clearTimeout(timeout); }
+};
+
+export const getGeminiSettings = () => requestGeminiSettings('GET');
+export const saveGeminiSettings = ({ api_key, model }) =>
+  requestGeminiSettings('PUT', { model, ...(api_key ? { api_key } : {}) });
+export const clearGeminiSettings = () => requestGeminiSettings('DELETE');
+
 /**
  * Upload and analyze media files or text
  * @param {File|string} content - The file to upload or text string
