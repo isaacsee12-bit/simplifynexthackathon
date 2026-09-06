@@ -1,0 +1,11 @@
+Transformers or PyTorch not installed. Falling back to heuristics.
+Librosa loaded successfully — advanced audio analysis enabled.
+INFO:     127.0.0.1:60353 - "GET / HTTP/1.1" 200 OK
+INFO:     127.0.0.1:60353 - "GET /assets/index-D_UFjsn_.js HTTP/1.1" 200 OK
+INFO:     127.0.0.1:49355 - "GET /assets/index-DIMRM1EL.css HTTP/1.1" 200 OK
+INFO:     127.0.0.1:49355 - "GET /api/settings/gemini HTTP/1.1" 200 OK
+INFO:     127.0.0.1:49355 - "GET /favicon.svg HTTP/1.1" 200 OK
+INFO:     127.0.0.1:63492 - "PUT /api/settings/gemini HTTP/1.1" 200 OK
+INFO:     127.0.0.1:63492 - "GET /api/settings/gemini HTTP/1.1" 200 OK
+INFO:     127.0.0.1:63492 - "POST /api/settings/gemini/test HTTP/1.1" 200 OK
+INFO:     127.0.0.1:63492 - "GET /api/settings/gemini HTTP/1.1" 200 OK
