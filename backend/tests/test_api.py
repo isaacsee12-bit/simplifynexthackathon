@@ -111,6 +111,16 @@ class APITests(unittest.TestCase):
             "audio_analyzer", "ocr_engine", "rag_verifier",
         ], "active"))
 
+    def test_vercel_requirements_are_flat_and_match_backend(self):
+        root = Path(__file__).resolve().parents[2]
+        requirements = []
+        for path in (root / "requirements.txt", root / "backend/requirements.txt"):
+            lines = [line.strip() for line in path.read_text().splitlines()
+                     if line.strip() and not line.lstrip().startswith("#")]
+            self.assertFalse(any(line.startswith("-") for line in lines))
+            requirements.append(lines)
+        self.assertEqual(requirements[0], requirements[1])
+
     def test_text_success_schema_model_and_config(self):
         finding = {"category": "AI Generation", "finding": "Offline model finding",
                    "confidence": 0.25, "severity": "low"}

@@ -61,7 +61,7 @@ OCR additionally requires the Tesseract system executable on `PATH`; installing 
 ## Vercel Deployment
 
 1. Import the repository as a Vercel project with the **repository root** as its Root Directory, not `webapp/` or `backend/`.
-2. Use the native **FastAPI** framework. `vercel.json` selects it, root `app.py` exports `app`, root `requirements.txt` includes `backend/requirements.txt`, and `.python-version` pins Python 3.12.
+2. Use the native **FastAPI** framework. `vercel.json` selects it, root `app.py` exports `app`, and `.python-version` pins Python 3.12. Root `requirements.txt` lists dependencies directly because Vercel's dependency discovery failed to parse the nested requirements include. Keep it aligned with `backend/requirements.txt`; the regression suite checks this.
 3. Add `GEMINI_API_KEY` and, if needed, `GEMINI_MODEL` as backend environment variables in Vercel for the appropriate deployment environments.
 4. Leave Install Command and Output Directory overrides unset. The configured Build Command is `npm --prefix webapp ci && npm --prefix webapp run build -- --outDir ../public --emptyOutDir`.
 5. Deploy. Vercel serves the generated root `public/` files through its CDN, while API requests run in the native FastAPI function. FastAPI uses `public/index.html` for unmatched frontend routes and returns HTTP 404 for unknown API paths. It does not mount `public/`.
