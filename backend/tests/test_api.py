@@ -33,7 +33,7 @@ from models.schemas import AnalysisResult, HealthResponse
 
 class APITests(unittest.TestCase):
     text = "Studies show that regular exercise improves cardiovascular health."
-    context = "<b>Regular exercise</b> improves cardiovascular health."
+    context = "Regular exercise improves cardiovascular health."
 
     def setUp(self):
         # Windows asyncio creates a loopback socket pair when starting its loop.
@@ -50,13 +50,18 @@ class APITests(unittest.TestCase):
         self.enterContext(patch.object(text_module, "gemini_provider", SimpleNamespace(gemini_client=None)))
         self.enterContext(patch.object(rag_module, "gemini_provider", SimpleNamespace(gemini_client=None)))
         self.wikipedia = self.enterContext(patch.object(
-            rag_module.rag_verifier, "_query_wikipedia", return_value=self.context
+            rag_module.rag_verifier, "_query_wikipedia", return_value=[{
+                "title": "Exercise research", "url": "https://reuters.com/science/exercise",
+                "excerpt": self.context,
+            }]
         ))
         self.duckduckgo = self.enterContext(patch.object(
             rag_module.rag_verifier, "_query_duckduckgo",
-            side_effect=AssertionError("Unexpected search fallback"),
+            return_value=[{
+                "title": "Independent research", "url": "https://bbc.com/news/exercise",
+                "excerpt": self.context,
+            }],
         ))
-        self.addCleanup(self.duckduckgo.assert_not_called)
 
     def fake_client(self, module, payload):
         generate = Mock(return_value=SimpleNamespace(text=json.dumps(payload)))
@@ -77,7 +82,7 @@ class APITests(unittest.TestCase):
         if content_type == "text" and body["verdict"] != "inconclusive":
             self.assertGreaterEqual(body["trust_score"], 0)
             self.assertLessEqual(body["trust_score"], 100)
-            self.assertIsInstance(body["is_authentic"], bool)
+            self.assertIsNone(body["is_authentic"])
         else:
             self.assertIsNone(body["trust_score"])
             self.assertIsNone(body["is_authentic"])
@@ -95,14 +100,28 @@ class APITests(unittest.TestCase):
             self.assertLessEqual(detail["confidence"], 1)
         return body
 
-    def assert_generation(self, generate, temperature, tokens):
-        generate.assert_called_once()
-        kwargs = generate.call_args.kwargs
-        self.assertEqual(kwargs["model"], settings.GEMINI_MODEL)
-        self.assertIn("cardiovascular health", kwargs["contents"])
-        self.assertEqual(kwargs["config"].response_mime_type, "application/json")
-        self.assertEqual(kwargs["config"].temperature, temperature)
-        self.assertEqual(kwargs["config"].max_output_tokens, tokens)
+    def investigation_client(self, stance="supported"):
+        generate = self.fake_client(rag_module, {})
+
+        def respond(**kwargs):
+            schema = kwargs["config"].response_schema["title"]
+            if schema == "_Claims":
+                payload = {"claims": [self.text]}
+            elif schema == "_Plan":
+                payload = {"tool": "wikipedia", "query": "exercise cardiovascular health"}
+            else:
+                self.assertEqual(schema, "_Assessment")
+                data = json.loads(kwargs["contents"].split("DATA: ", 1)[1])
+                payload = {
+                    "citations": [{"evidence_id": source["id"], "quote": self.context,
+                                   "stance": stance} for source in data["sources"]],
+                    "reasoning": "Offline context evaluation", "uncertainties": [],
+                    "followup": {"tool": "duckduckgo", "query": "exercise independent evidence"},
+                }
+            return SimpleNamespace(text=json.dumps(payload))
+
+        generate.side_effect = respond
+        return generate
 
     def test_health_and_safe_configuration(self):
         self.assertEqual(os.environ["VERCEL"], "1")
@@ -114,10 +133,11 @@ class APITests(unittest.TestCase):
         self.assertEqual(body["status"], "healthy")
         self.assertEqual(body["app_name"], settings.APP_NAME)
         self.assertEqual(body["version"], settings.APP_VERSION)
-        self.assertEqual(body["analyzers"], dict.fromkeys([
-            "text_analyzer", "image_analyzer", "video_analyzer",
-            "audio_analyzer", "ocr_engine", "rag_verifier",
-        ], "active"))
+        self.assertEqual(body["analyzers"]["text_analyzer"], "local_heuristics")
+        self.assertEqual(body["analyzers"]["rag_verifier"], "not_configured")
+        self.assertEqual(body["analyzers"]["gemini"], "not_configured")
+        self.assertIn(body["analyzers"]["ocr_engine"], ("available", "unavailable"))
+        self.assertNotIn("*", settings.CORS_ORIGINS)
 
     def test_vercel_requirements_are_flat_and_match_backend(self):
         root = Path(__file__).resolve().parents[2]
@@ -129,21 +149,27 @@ class APITests(unittest.TestCase):
             requirements.append(lines)
         self.assertEqual(requirements[0], requirements[1])
 
-    def test_text_success_schema_model_and_config(self):
-        finding = {"category": "AI Generation", "finding": "Offline model finding",
-                   "confidence": 0.25, "severity": "low"}
-        generate = self.fake_client(text_module, {
-            "details": [finding],
-            "scores": {"ai_score": 0.25, "scam_score": 0.1, "misinfo_score": 0.05},
-        })
-        with patch.object(settings, "GEMINI_MODEL", "offline-test-model"):
-            body = self.assert_result(self.client.post("/api/analyze/text", json={
-                "text": self.text, "check_claims": False,
-            }), "text")
-            self.assert_generation(generate, 0.1, 1500)
-        self.assertIn(finding, body["details"])
-        self.assertEqual(body["extracted_text"], self.text)
+    def test_text_local_checks_never_use_unsourced_llm(self):
+        generate = self.fake_client(text_module, {})
+        text = "In conclusion, act now! Urgent: send money and your password."
+        for ai, scam, categories in [
+            (True, False, {"AI Generation"}),
+            (False, True, {"Scam Phishing"}),
+            (True, True, {"AI Generation", "Scam Phishing"}),
+        ]:
+            with self.subTest(ai=ai, scam=scam):
+                body = self.assert_result(self.client.post("/api/analyze/text", json={
+                    "text": text, "check_claims": False,
+                    "check_ai_generated": ai, "check_scam": scam,
+                }), "text")
+                self.assertEqual({d["category"] for d in body["details"]}, categories)
+                self.assertIsNotNone(body["trust_score"])
+                self.assertEqual(body["extracted_text"], text)
+                self.assertIsNone(body["investigation"])
+                self.assertIn("Factual claims were not checked.", body["uncertainties"])
+        generate.assert_not_called()
         self.wikipedia.assert_not_called()
+        self.duckduckgo.assert_not_called()
 
     def test_text_all_toggles_off(self):
         text_generate = self.fake_client(text_module, {})
@@ -153,64 +179,99 @@ class APITests(unittest.TestCase):
             "check_ai_generated": False, "check_scam": False,
         }), "text")
         self.assertEqual(body["details"], [])
+        self.assertIsNone(body["investigation"])
+        self.assertEqual(body["verdict"], "inconclusive")
         self.assertEqual(body["claims_verified"], 0)
         self.assertEqual(body["claims_flagged"], 0)
         text_generate.assert_not_called()
         rag_generate.assert_not_called()
         self.wikipedia.assert_not_called()
+        self.duckduckgo.assert_not_called()
 
-    def test_rag_verdicts(self):
+    def test_investigation_verdicts_and_structured_provider_contract(self):
         for verdict, verified, flagged, severity in [
             ("supported", 1, 0, "low"),
             ("refuted", 0, 1, "high"),
             ("uncertain", 0, 0, "medium"),
         ]:
             with self.subTest(verdict=verdict):
-                generate = self.fake_client(rag_module, {
-                    "verdict": verdict, "reasoning": "Offline context evaluation",
-                })
-                body = self.assert_result(self.client.post("/api/analyze/text", json={
-                    "text": self.text, "check_ai_generated": False, "check_scam": False,
-                }), "text")
+                generate = self.investigation_client(verdict)
+                with patch.object(settings, "GEMINI_MODEL", "offline-test-model"):
+                    body = self.assert_result(self.client.post("/api/analyze/text", json={
+                        "text": self.text, "check_ai_generated": False, "check_scam": False,
+                    }), "text")
                 self.assertEqual(body["claims_verified"], verified)
                 self.assertEqual(body["claims_flagged"], flagged)
                 self.assertEqual(len(body["details"]), 1)
                 self.assertEqual(body["details"][0]["severity"], severity)
                 self.assertIn("Offline context evaluation", body["details"][0]["finding"])
-                self.assert_generation(generate, 0.0, 300)
-                self.assertNotIn("<b>", generate.call_args.kwargs["contents"])
+                investigation = body["investigation"]
+                claim = investigation["claims"][0]
+                self.assertEqual(claim["text"], self.text)
+                self.assertEqual(claim["verdict"], verdict)
+                self.assertEqual({e["publisher"] for e in claim["evidence"]}, {"Reuters", "BBC"})
+                self.assertEqual([e["id"] for e in claim["evidence"]], ["c1-e1", "c1-e2"])
+                self.assertTrue(all(e["retrieved_at"] and e["excerpt"] == self.context
+                                    for e in claim["evidence"]))
+                self.assertEqual(body["recommended_action"], investigation["recommended_action"])
+                self.assertTrue(set(investigation["uncertainties"]) <= set(body["uncertainties"]))
+                trace = investigation["trace"]
+                self.assertEqual([e["sequence"] for e in trace], list(range(1, len(trace) + 1)))
+                self.assertTrue({"plan", "act", "observe", "adapt", "conclude"} <=
+                                {e["phase"] for e in trace})
+                self.assertEqual(generate.call_count, 4)
+                for call in generate.call_args_list:
+                    self.assertEqual(call.kwargs["model"], "offline-test-model")
+                    config = call.kwargs["config"]
+                    self.assertEqual(config.response_mime_type, "application/json")
+                    self.assertEqual(config.temperature, 0)
+                    self.assertEqual(config.max_output_tokens, 1800)
+                    self.assertEqual(config.http_options.retry_options.attempts, 1)
+                if verdict == "uncertain":
+                    self.assertEqual(body["verdict"], "inconclusive")
+                else:
+                    self.assertIsNotNone(body["trust_score"])
         self.assertEqual(self.wikipedia.call_count, 3)
+        self.assertEqual(self.duckduckgo.call_count, 3)
 
-    def test_llm_failures_are_sanitized(self):
+    def test_investigation_provider_failures_are_sanitized(self):
         secret = "fake-api-key-not-a-real-credential"
         exception_message = "private upstream exception " + secret
-        for module in (text_module, rag_module):
+        for schema in (rag_module._Claims, rag_module._Plan, rag_module._Assessment):
             for failure in ("malformed_json", "exception"):
-                with self.subTest(module=module.__name__, failure=failure):
-                    generate = self.fake_client(module, {})
-                    if failure == "malformed_json":
-                        generate.return_value = SimpleNamespace(text="not JSON " + secret)
-                    else:
-                        generate.side_effect = RuntimeError(exception_message)
-                    is_rag = module is rag_module
+                with self.subTest(schema=schema.__name__, failure=failure):
+                    generate = self.investigation_client()
+                    respond = generate.side_effect
+
+                    def fail(**kwargs):
+                        if kwargs["config"].response_schema["title"] == schema.__name__:
+                            if failure == "malformed_json":
+                                return SimpleNamespace(text="not JSON " + secret)
+                            raise RuntimeError(exception_message)
+                        return respond(**kwargs)
+
+                    generate.side_effect = fail
                     output = io.StringIO()
                     with redirect_stdout(output), redirect_stderr(output):
                         response = self.client.post("/api/analyze/text", json={
-                            "text": self.text, "check_claims": is_rag,
-                            "check_ai_generated": not is_rag, "check_scam": False,
+                            "text": self.text, "check_claims": True,
+                            "check_ai_generated": False, "check_scam": False,
                         })
                     body = self.assert_result(response, "text")
-                    self.assertEqual(body["claims_verified"], 0)
-                    if is_rag:
-                        self.assertIsNone(body["trust_score"])
-                        self.assertIsNone(body["risk_level"])
+                    self.assertEqual(body["claims_flagged"], 0)
+                    if schema is rag_module._Assessment:
+                        self.assertEqual(body["claims_verified"], 0)
                         self.assertEqual(body["verdict"], "inconclusive")
+                    else:
+                        # Extraction/planning failures can recover through explicit fallbacks.
+                        self.assertEqual(body["claims_verified"], 1)
                     self.assertTrue(any(
-                        "unavailable" in detail["finding"] for detail in body["details"]
+                        "unavailable" in event["message"] for event in body["investigation"]["trace"]
                     ))
                     self.assertNotIn(secret, response.text + output.getvalue())
                     self.assertNotIn(exception_message, response.text + output.getvalue())
-                    generate.assert_called_once()
+                    self.assertTrue(any(call.kwargs["config"].response_schema["title"] == schema.__name__
+                                        for call in generate.call_args_list))
 
     def test_absent_client_does_not_verify_claims(self):
         body = self.assert_result(self.client.post("/api/analyze/text", json={
@@ -218,21 +279,45 @@ class APITests(unittest.TestCase):
         }), "text")
         self.assertEqual(body["claims_verified"], 0)
         self.assertEqual(body["claims_flagged"], 0)
-        self.assertTrue(any("not configured" in d["finding"] for d in body["details"]))
-        self.assertTrue(any("Claim unverified" in d["finding"] for d in body["details"]))
-        self.wikipedia.assert_called_once()
+        self.assertEqual(body["verdict"], "inconclusive")
+        claim = body["investigation"]["claims"][0]
+        self.assertEqual(claim["verdict"], "uncertain")
+        self.assertEqual(claim["evidence"], [])
+        self.assertTrue(any("not configured" in u for u in claim["uncertainties"]))
+        self.assertTrue(any("fallback" in u for u in body["uncertainties"]))
+        self.wikipedia.assert_not_called()
+        self.duckduckgo.assert_not_called()
 
     def test_missing_retrieval_is_not_a_flagged_claim(self):
-        self.wikipedia.return_value = None
-        self.duckduckgo.side_effect = None
-        self.duckduckgo.return_value = None
+        generate = self.investigation_client()
+        self.wikipedia.return_value = []
+        self.duckduckgo.return_value = []
         body = self.assert_result(self.client.post("/api/analyze/text", json={
             "text": self.text, "check_ai_generated": False, "check_scam": False,
         }), "text")
         self.assertEqual(body["claims_flagged"], 0)
         self.assertEqual(body["verdict"], "inconclusive")
+        self.assertEqual(body["claims_verified"], 0)
+        self.assertEqual(body["investigation"]["claims"][0]["evidence"], [])
+        self.assertEqual(generate.call_count, 2)
+        self.wikipedia.assert_called_once()
         self.duckduckgo.assert_called_once()
-        self.duckduckgo.reset_mock()
+
+    def test_single_publisher_cannot_verify_or_refute(self):
+        for stance in ("supported", "refuted"):
+            with self.subTest(stance=stance):
+                self.investigation_client(stance)
+                self.duckduckgo.return_value[0]["url"] = "https://reuters.com/another-story"
+                body = self.assert_result(self.client.post("/api/analyze/text", json={
+                    "text": self.text, "check_ai_generated": False, "check_scam": False,
+                }), "text")
+                self.assertEqual(body["claims_verified"], 0)
+                self.assertEqual(body["claims_flagged"], 0)
+                self.assertEqual(body["verdict"], "inconclusive")
+                claim = body["investigation"]["claims"][0]
+                self.assertEqual(claim["verdict"], "uncertain")
+                self.assertEqual(len(claim["evidence"]), 2)
+                self.assertIn("Abstain", body["recommended_action"])
 
     def test_real_png_image(self):
         buffer = io.BytesIO()

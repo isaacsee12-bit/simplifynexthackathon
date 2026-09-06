@@ -1,5 +1,23 @@
 @import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Space+Grotesk:wght@400;500;600;700&display=swap');
 
+.app-shell .hero{grid-template-columns:minmax(0,1fr) minmax(0,1fr)}
+.app-shell .verify-card,.app-shell .hero-copy{min-width:0}
+.app-shell .card-heading,.app-shell .card-footer{flex-wrap:wrap;gap:16px}
+.app-shell .drop-area{width:100%;min-width:0;overflow-wrap:anywhere}
+.app-shell .drop-area strong,.app-shell .format-note{min-width:0;max-width:100%;overflow-wrap:anywhere}
+.app-shell .mode-tabs{flex-wrap:wrap}
+.app-shell button:focus-visible,.app-shell a:focus-visible,.analysis-trace ol:focus-visible{outline:2px solid var(--deep);outline-offset:4px}
+.analysis-trace{padding:24px;margin:24px 0;border:1px solid var(--line);border-radius:16px;background:var(--panel);overflow-wrap:anywhere}
+.analysis-trace ol{max-height:320px;overflow:auto;padding-left:24px}
+.analysis-trace li{padding:12px 0;border-bottom:1px solid var(--line)}
+.analysis-trace li span{display:block;color:var(--muted);font-size:13px;margin-top:6px}
+.analysis-trace li p{white-space:pre-wrap;line-height:1.6;margin-bottom:0}
+.analysis-report a{text-decoration:underline;text-underline-offset:3px}
+.analysis-report blockquote{margin:12px 0;padding-left:16px;border-left:3px solid var(--mint)}
+@media(max-width:900px){.app-shell .hero{grid-template-columns:minmax(0,1fr)}}
+@media(max-width:480px){.app-shell main,.app-shell .topbar,.app-shell footer{padding-left:20px;padding-right:20px}.app-shell .verify-card{padding:20px}.app-shell .card-footer>*{width:100%}.app-shell .mode-tabs button{min-width:0;flex:1 1 40%}.app-shell .hero-proof{flex-wrap:wrap}}
+@media(prefers-reduced-motion:reduce){html{scroll-behavior:auto}.app-shell *{animation:none!important;transition:none!important}}
+
 .app-shell .analysis-report{display:block;overflow-wrap:anywhere}
 .analysis-report .result-meta{display:flex;flex-wrap:wrap;gap:12px 24px;margin:20px 0}
 .analysis-report .source-report{border-top:1px solid var(--line);padding-top:20px;margin-top:24px;min-width:0}

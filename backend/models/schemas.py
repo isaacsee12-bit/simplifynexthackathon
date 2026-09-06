@@ -2,6 +2,7 @@ from pydantic import BaseModel, Field
 from typing import Optional, List, Literal
 from enum import Enum
 from datetime import datetime
+from models.investigation import Investigation
 
 
 class RiskLevel(str, Enum):
@@ -76,6 +77,9 @@ class AnalysisResult(BaseModel):
     is_authentic: Optional[bool]
     verdict: Optional[Literal["suspicious", "no_indicators", "inconclusive"]] = None
     provenance: List[AnalysisProvenance] = Field(default_factory=list)
+    investigation: Optional[Investigation] = None
+    recommended_action: str = "Verify independently before relying on this content."
+    uncertainties: List[str] = Field(default_factory=list)
     summary: str
     explanation: str
     analysis_summary: Optional[str] = None
@@ -96,7 +100,7 @@ class AnalysisResult(BaseModel):
 
 class TextAnalysisRequest(BaseModel):
     """Request body for text analysis."""
-    text: str
+    text: str = Field(min_length=1, max_length=12000, pattern=r"\S")
     check_claims: bool = True
     check_ai_generated: bool = True
     check_scam: bool = True

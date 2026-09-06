@@ -18,30 +18,31 @@ class TextAnalyzer:
     4. AI-writing pattern detection
     """
 
-    def analyze(self, text: str) -> Tuple[List[AnalysisDetail], dict]:
+    def analyze(self, text: str, *, check_ai_generated=True, check_scam=True,
+                use_llm=True) -> Tuple[List[AnalysisDetail], dict]:
         details = []
         text_length = len(text)
         word_count = len(text.split())
 
-        if text_length < 10:
+        if text_length < 10 and check_ai_generated:
             details.append(AnalysisDetail(
-                category="AI Generation",
+                category="System Error",
                 finding="Text too short for comprehensive analysis",
                 confidence=0.1,
                 severity=RiskLevel.LOW
             ))
-            return details, {"text_length": text_length, "word_count": word_count}
 
         # 1. Statistical text analysis (pre-LLM signals)
-        stats = self._statistical_analysis(text, details)
+        stats = self._statistical_analysis(text, details) if check_ai_generated and text_length >= 10 else {}
 
         # 2. Pattern-based scam/phishing detection
-        self._scam_pattern_detection(text, details)
+        if check_scam:
+            self._scam_pattern_detection(text, details)
 
         # 3. LLM-based deep analysis
-        if gemini_provider.gemini_client:
+        if use_llm and gemini_provider.gemini_client:
             self._llm_analysis(text, details, stats)
-        else:
+        elif use_llm:
             details.append(AnalysisDetail(
                 category="System Error",
                 finding="Gemini API key not configured. LLM-based text analysis unavailable.",

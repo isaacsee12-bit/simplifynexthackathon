@@ -1,3 +1,5 @@
+import { readAnalysisStream } from './analysisStream.js';
+
 // API utility for communicating with the FastAPI backend
 const API_BASE_URL = import.meta.env.VITE_API_URL || '/api';
 
@@ -44,8 +46,9 @@ export const testGeminiConnection = () => requestGeminiSettings('POST', undefine
  * @param {string} type - 'text', 'image', 'video', or 'audio'
  * @returns {Promise<Object>} Analysis result
  */
-export const analyzeContent = async (content, type) => {
-  const endpoint = `${API_BASE_URL}/analyze/${type}`;
+export const analyzeContent = async (content, type, { onEvent, signal } = {}) => {
+  if (!['text', 'image', 'video', 'audio'].includes(type)) throw new Error('Unsupported content type.');
+  const endpoint = `${API_BASE_URL}/analyze/${type}?stream=true`;
   
   try {
     let options = {};
@@ -69,15 +72,14 @@ export const analyzeContent = async (content, type) => {
       };
     }
 
-    const response = await fetch(endpoint, options);
+    const response = await fetch(endpoint, { ...options, signal, headers: { ...options.headers, Accept: 'application/x-ndjson' } });
     
     if (!response.ok) {
       throw new Error(`API error: ${response.status} ${response.statusText}`);
     }
     
-    return await response.json();
+    return await readAnalysisStream(response, { onEvent, signal });
   } catch (error) {
-    console.error('Analysis failed:', error);
     throw error;
   }
 };

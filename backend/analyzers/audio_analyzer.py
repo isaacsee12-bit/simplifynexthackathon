@@ -204,16 +204,26 @@ class AudioAnalyzer:
         Real speech has natural pitch variation; TTS is often too smooth or periodic.
         """
         try:
-            # Extract pitch using piptrack
-            pitches, magnitudes = librosa.piptrack(y=audio, sr=sr)
-
-            # Get the most prominent pitch per frame
-            pitch_values = []
-            for t in range(pitches.shape[1]):
-                index = magnitudes[:, t].argmax()
-                pitch = pitches[index, t]
-                if pitch > 50 and pitch < 800:  # Valid speech range
-                    pitch_values.append(pitch)
+            # Match piptrack's defaults without its cached Numba interpolation
+            # kernel, which can access-violate on Windows worker threads.
+            n_fft = 2048
+            spectrum = np.abs(librosa.stft(audio, n_fft=n_fft, hop_length=512))
+            left, center, right = spectrum[:-2], spectrum[1:-1], spectrum[2:]
+            curvature = left + right - 2 * center
+            gradient = (right - left) / 2
+            shift = np.zeros_like(center)
+            np.divide(-gradient, curvature, out=shift,
+                      where=np.abs(gradient) < np.abs(curvature))
+            frequencies = np.arange(1, spectrum.shape[0] - 1)[:, None] * sr / n_fft
+            peaks = ((center > left) & (center >= right)
+                     & (center > 0.1 * spectrum.max(axis=0))
+                     & (frequencies >= 150) & (frequencies < min(4000, sr / 2)))
+            magnitudes = np.where(peaks, center + 0.5 * gradient * shift, 0)
+            indices = magnitudes.argmax(axis=0)
+            frames = np.arange(spectrum.shape[1])
+            pitches = (indices + 1 + shift[indices, frames]) * sr / n_fft
+            pitch_values = pitches[(magnitudes[indices, frames] > 0)
+                                   & (pitches > 50) & (pitches < 800)]
 
             if len(pitch_values) < 20:
                 return

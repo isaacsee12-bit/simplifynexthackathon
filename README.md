@@ -1,12 +1,68 @@
 # VerifyAI
 
-"See through the lies."
+## SimplifyNext Agentic AI Hackathon
 
-VerifyAI is a multimodal content-verification demo with a FastAPI backend and a React 18 / Vite dashboard. It combines text, image, video, and audio analysis with risk scores and explanations. Results are indicators for review, not proof of authenticity.
+VerifyAI is a bounded, evidence-seeking assistant for reviewing questionable text and media before acting or sharing. A React 18 / Vite dashboard streams the work of a FastAPI backend, shows claim-level evidence and uncertainty, and recommends a human verification step. Image, video, and audio observations remain separate from factual claim investigation. Results are review aids, not proof of authenticity.
+
+**Submission focus:** a single agent that chooses a retrieval tool and query, observes evidence gaps or disagreement, adapts its next search, and concludes or abstains under explicit budgets. This is not a multi-agent system: extraction, planning, and assessment are structured calls within one controller, not independent collaborating agents.
+
+## Architecture
+
+```text
+React dashboard -> POST /api/analyze/{text,image,video,audio}?stream=true
+  -> validation -> request-local analysis_response orchestration
+     -> local checks / media preparation / Gemini media assessment
+     -> text or image OCR -> RAGVerifier.investigate
+        extract -> plan -> retrieve -> assess -> adapt (bounded) -> conclude
+  <- NDJSON trace records -> terminal result or sanitized error
+  -> evidence excerpts, publisher links, coverage, uncertainties, next action
+```
+
+| Component | Implemented responsibility |
+| --- | --- |
+| [`rag_verifier.py`](backend/analyzers/rag_verifier.py) | Structured exact-span claim extraction, model-selected Wikipedia or DuckDuckGo query, snippet assessment, adaptive follow-up, deterministic evidence and verdict gates. |
+| [`investigation.py`](backend/models/investigation.py) | Claim verdicts (`supported`, `refuted`, `uncertain`, `conflicting`), evidence IDs/URLs/excerpts/publishers/timestamps, trace, uncertainty, recommended action. |
+| [`investigation_stream.py`](backend/core/investigation_stream.py) | Shared JSON/NDJSON execution, request-local trace sequencing and elapsed times, thread offloading, terminal errors and disconnect handling. |
+| [`routers/`](backend/routers) | Text investigation and independent local-check toggles; image OCR investigation plus actual image assessment; sampled video and audio assessment. |
+| [`Reconstruction.jsx`](webapp/src/Reconstruction.jsx) | Live activity, cancellation, stale-request guards, evidence reports, media provenance, and local-only API settings. [`analysisStream.js`](webapp/src/utils/analysisStream.js) handles chunked UTF-8 NDJSON and rejects incomplete streams. |
+
+### Agent Decisions And Bounds
+
+1. Consider at most 12,000 input characters and three claims. Model-extracted claims must be exact input spans; duplicates and paraphrases are rejected. If extraction is unavailable, exact sentences are used with an explicit non-validated-extraction warning.
+2. Choose `wikipedia` search or `duckduckgo` instant answers and a focused query. Retrieve snippets, not full articles. Only fixed HTTPS API endpoints are fetched; redirects are blocked and responses are capped at 256,000 bytes. Model-provided source URLs are never fetched.
+3. Accept only allowlisted HTTPS publisher URLs, reject snippets matching a conservative instruction pattern, deduplicate URLs, and check cited evidence IDs and verbatim quotes of at least 20 characters. Two distinct publisher identities are required for a decisive verdict; opposing stances produce `conflicting`. Reported assessment uncertainties prevent an otherwise decisive verdict. The instruction pattern is not a complete injection detector.
+4. If evidence remains insufficient or conflicting, use the assessment's follow-up tool/query; repeated plans are replaced with an alternative-tool query. Each claim gets at most two retrieval rounds. Failures and exhausted budgets retain uncertainty rather than inventing evidence.
+5. Share a cap of 16 external calls and a 25-second investigation wait budget, with at most four seconds per call. These bounds cover extraction, planning, retrieval, and assessment, not upload time or the entire multimodal request. A later claim can run out of budget. Running SDK threads cannot be forcibly killed; late results are discarded.
+
+Without a configured Gemini client, the investigator reports uncertain sentence candidates and performs no retrieval or semantic assessment. Trace events are operational summaries, not private model reasoning. Cancellation stops later stages/callback-driven investigation work, but cannot recall submitted data or stop an already-running provider/local worker. Proxy buffering can delay visible streaming.
+
+### Originality
+
+The contribution is the integration of adaptive snippet investigation, code-enforced corroboration and abstention, and request-local streaming into a multimodal review workflow. It is more than a single prompt with a score: the next retrieval depends on the observed evidence, and application code checks evidence structure before aggregating a verdict. It uses existing Gemini models, public retrieval APIs, and local analysis libraries; it does not introduce a new foundation model, prove semantic truth, or claim novel multi-agent coordination.
+
+## Measured Benchmark
+
+The [benchmark report](docs/benchmark-results.md) records 11 deterministic, synthetic, one-claim fixtures run through the production investigator with only Gemini generation and HTTP retrieval boundaries replaced. Fictional Lumen observatory snippets are not real publisher content. Socket access is blocked. **These numbers measure orchestration policy, not real-world factual accuracy, live Gemini performance, or media detection quality.**
+
+| Recorded metric | Investigation | Single-source/no-follow-up baseline |
+| --- | ---: | ---: |
+| Exact fixture verdict accuracy | 11/11 (100%) | 8/11 (72.7%) |
+| Abstention recall on expected-abstention cases | 8/8 (100%) | 5/8 (62.5%) |
+| Structurally valid decisive citations | 6/6 (100%) | 6/6 (100%) |
+| Decisive verdicts with two validated publishers | 3/3 (100%) | 0/6 (0%) |
+| Adaptive follow-up coverage | 11/11 (100%) | 0/11 (0%) |
+| Total external boundary calls | 60 | 41 |
+| Maximum calls in a case | 6 | 4 |
+
+The improvement is three additional correct fixture labels, or 27.3 percentage points, at 19 extra mocked calls. The baseline is a separate straight-line controller using the same provider methods and instruction filter, with exactly one retrieval and at most one source assessment; it is not the previous shipped implementation. Fixtures favor the investigation's corroboration policy. Two `.venv/Scripts/python.exe` runs produced identical verdicts and counts on Windows 11/Python 3.12.11 (`google-genai 1.46.0`, `pydantic 2.8.0`). Second-run maximum/summed case runtimes were 2.019/12.552 ms versus 0.512/1.712 ms. These exclude imports/setup and measure mock overhead, not network latency or a production SLA; the baseline also omits production thread/trace overhead. See the report for definitions and limitations.
+
+**Originally exposed injection failure, now fixed for these fixtures:** the first benchmark returned `supported` for the obeyed-injection case, yielding 10/11 investigation accuracy. `RAGVerifier.INSTRUCTION_PATTERN` now rejects both unchanged injection fixtures before assessment, returning `uncertain` in both policies. This conservative rule is not complete injection protection. Citation validity is not semantic entailment, publisher identity is not proof of editorial independence, and these runs do not measure live-model injection resistance.
+
+Use `--check` to exit 1 on any investigation verdict mismatch; baseline errors remain informational. Without it, mismatches are measurements only. Both measured runs passed `--check`; an in-memory label-change probe verified its failure path and JSON output. The report includes a two-call abstention probe, but no multi-claim saturation study, live-search evaluation, multilingual evaluation, calibrated confidence study, or production-scale/load test. No live provider verification or deployed smoke-test result is claimed here.
 
 ## Local Setup
 
-Use Python 3.12 and Node.js 20 or newer. Run these commands from the repository root:
+Use Python 3.12 and Node.js 22 (the CI and Docker versions). Run these commands from the repository root:
 
 ```bash
 python -m venv .venv
@@ -16,16 +72,17 @@ python -m pip install -r requirements.txt
 
 On Windows PowerShell, activate with `.venv\Scripts\Activate.ps1` instead.
 
-Configure backend environment variables using the root `.env.example` as a reference:
+Create a root `.env` using [`.env.example`](.env.example) as a reference, or configure backend environment variables directly:
 
 | Variable | Purpose |
 | --- | --- |
 | `GEMINI_API_KEY` | Backend-only Gemini API secret. The example intentionally contains no key. |
 | `GEMINI_MODEL` | Configurable model ID; defaults to `gemini-3.8-flash`. |
+| `CORS_ORIGINS` | Comma-separated allowed frontend origins; defaults to localhost and 127.0.0.1 on port 5173. Same-origin deployments need no override. |
 
 Model availability depends on your account and the provider's current offerings. If the default is unavailable, set `GEMINI_MODEL` to a model your account can access. Never put the API key in a `VITE_` variable or frontend source: Vite variables are embedded in the public browser bundle.
 
-The backend uses Google's official `google-genai` Python SDK for actual image, sampled-video-frame, and audio requests, as well as text analysis and retrieved claim verification. It loads `.env` from the repository root (or `backend/.env`); existing server environment variables take precedence. Without a key, local supplementary checks still run, but Gemini media analysis is explicitly `not_configured` and the media verdict is inconclusive. Retrieved context alone is not counted as a verified claim.
+The backend uses Google's official `google-genai` Python SDK for actual image, sampled-video-frame, and audio requests, plus structured claim investigation. Text-route heuristics run locally with `use_llm=False`; model use is in the investigator. It loads `.env` from the repository root (or `backend/.env`); existing server environment variables take precedence. Without a key, local supplementary checks still run, but Gemini media analysis is explicitly `not_configured` and the media verdict is inconclusive. Retrieved context alone is not counted as a verified claim.
 
 Start the backend from the root:
 
@@ -72,6 +129,31 @@ This includes the base requirements plus PyTorch, torchvision, and transformers.
 
 OCR additionally requires the Tesseract system executable on `PATH`; installing the `pytesseract` Python wrapper alone is not sufficient.
 
+## Docker
+
+```bash
+docker build -t verifyai .
+docker run --rm -p 127.0.0.1:8000:8000 --env-file .env verifyai
+```
+
+Open `http://localhost:8000`. The multi-stage image uses Node 22 with `npm ci`, Python 3.12 with root `requirements.txt`, and one Uvicorn worker. It serves the built `webapp/dist` from FastAPI. Omit `--env-file .env` for an unconfigured run. Secrets are supplied at runtime, not baked into the image; `.dockerignore` preserves `.env.example` but excludes actual environment files. The base image does not install Tesseract or optional neural vision dependencies. Container networking may make the backend's loopback-only settings guard reject browser settings requests; use runtime environment variables rather than weakening that guard.
+
+## Demo Script
+
+This is a suggested five-minute walkthrough, not a claim that a live demo was verified. Start the two local servers above; use non-sensitive sample media you have permission to process.
+
+1. **0:00, scope and settings.** Open **API** on localhost. Show configured status and the selected model. If authorized, save a key/model and optionally select **Test Gemini Connection**, explaining that this incurs a real text request and does not validate media capability. Do not expose the key on screen.
+2. **0:45, investigate text.** Select Text and enter `The Moon orbits Earth.` Select **Analyze now**. Explain the live plan/act/observe/adapt/conclude events. Review the actual returned claims, evidence excerpts, publisher links, uncertainty, and next action. Do not promise a `supported` outcome: sparse snippets, timeouts, or a single publisher should leave the result uncertain.
+3. **2:00, show repeatable evidence.** Run `python backend/tests/benchmark_investigation.py --check` (on Windows, use `.venv/Scripts/python.exe` if not activated). Compare 11/11 investigation labels with 8/11 for the baseline and 60 versus 41 calls. Show how the originally failing injection fixture now abstains because its snippets are rejected before assessment, while explaining the filter's limits. This synthetic CLI benchmark is separate from the live UI; it does not seed UI results.
+4. **3:00, preserve multimodal coverage.** Upload a small image with readable text, a short video, and a short WAV in their respective modes. For image OCR, show either extracted-text investigation or the explicit unavailable/no-readable-text limitation. For video, inspect timestamped sampled-frame coverage, not full-video claims. For audio, show the opening-sample duration and unverified speaker identity/spoken facts.
+5. **4:30, uncertainty and cancellation.** Start another analysis and select **Cancel analysis** while running. Explain in-flight work may continue. Clear the session key and rerun text or media to demonstrate explicit uncertainty/`not_configured`, not a fabricated successful verdict. End with the recommendation to review original full sources before consequential use.
+
+## API Contract
+
+`POST /api/analyze/text` accepts JSON with `text` (nonblank, at most 12,000 characters) and optional independent booleans `check_ai_generated`, `check_scam`, and `check_claims` (default true). Media endpoints accept multipart field `file`: image up to 15 MiB, video 50 MiB, audio 20 MiB. MIME/empty/size validation runs before streaming; these limits do not override hosting-platform limits.
+
+Without `?stream=true`, endpoints return the ordinary JSON `AnalysisResult`. With it, the response is `application/x-ndjson`: zero or more `{"type":"trace","event":...}` records followed by one `{"type":"result","result":...}` or sanitized `{"type":"error","message":...}` record. Input validation failures remain HTTP JSON errors. Evidence returned per claim includes retrieved snippets plus `cited_quotes` and `stances` from accepted assessments. These are separate, deduplicated lists, not paired quote/stance records; uncited evidence can have empty lists, and verbatim quotes do not prove semantic support. `claims_verified` is a legacy count of `supported` labels, not an independently established truth count. See `/docs` for schemas and `/api/health` for service status.
+
 ## Vercel Deployment
 
 1. Import the repository as a Vercel project with the **repository root** as its Root Directory, not `webapp/` or `backend/`.
@@ -93,7 +175,7 @@ The generated `public/` directory is ignored by Git. There are no legacy `builds
 
 ## Analysis Overview
 
-- **Text:** Statistical and phishing indicators, with provider-backed analysis and retrieved claim verification when configured.
+- **Text:** Local statistical and phishing indicators, with bounded retrieved claim investigation when configured. Uncertain/conflicting claims do not enter the legacy indicator score. There is no calibrated authorship or authenticity probability.
 - **Images:** Gemini receives one actual JPEG preview, resized to at most 1536 pixels on either side. Only the first frame of animated input is used; source metadata is not sent. Metadata, compression, noise, frequency, and face-related heuristics, the optional local neural detector, and OCR remain supplementary checks. OCR text is not a substitute for the image request.
 - **Video:** Gemini receives up to 15 actual JPEG frames (at most 768 pixels per side) with explicit timestamps. The same bounded sample is reused for local temporal checks; sampling spans the first through last source frame when decoding succeeds. The report lists prepared timestamps, source frame count, duration, and whether a request was attempted. **No video audio, continuous motion, or unsampled frames are analyzed by Gemini.** Decode failures can reduce coverage or prevent the request entirely.
 - **Audio:** Gemini receives real mono PCM WAV audio at 22050 Hz, reusing the decoded opening sample capped at 60 seconds. Spectral, signal, and container checks remain supplementary. Coverage reports the sample duration, not an invented full-file duration. The remainder and speaker identity are not verified. Unsupported codecs or failed decoding produce `insufficient_media`, never a text-only imitation of audio analysis.
@@ -108,19 +190,36 @@ Missing credentials, insufficient decodable media, timeouts, authentication/acce
 
 Blocking SDK and local analyzer work is offloaded from FastAPI's event loop. Gemini HTTP requests have the existing 30-second timeout plus a 35-second application wait limit; an already running SDK thread cannot be forcibly stopped when that wait expires. Local decoding/heuristics are not covered by the provider timeout. A plain SDK response schema with independent Pydantic validation is tested against installed `google-genai 1.46.0` and `pydantic 2.8.0`; no dependency upgrade is required.
 
-### Media Privacy
+### Privacy And Costs
 
-With Gemini configured, prepared media is sent to Google. Optional extracted-text claim checks also use external retrieval services. Provider data-retention policies apply; do not submit sensitive media without permission. The app does not persist uploads, but temporary decoding files and in-memory payloads exist during processing. Session keys remain backend-memory-only, are never returned, and reset on restart. Keep local settings private and use one worker.
+With Gemini configured, submitted text or image OCR text, claims, queries, and retrieved excerpts can be sent to Google; prepared media is also sent to Google. Search queries go to Wikipedia and/or DuckDuckGo, and opening a source link contacts that publisher. Provider retention and usage policies apply. Do not submit sensitive content without permission. The app does not persist uploads as a feature, but temporary decoding files and in-memory payloads exist during processing; this is not a secure-erasure guarantee. Session keys remain backend-memory-only, are never returned, and reset on restart. Keep local settings private and use one worker.
+
+Gemini requests, including connection tests and adaptive follow-ups, may incur account-specific token/media charges. Retrieval has availability/rate constraints; hosting and optional model downloads also have resource costs. The 16-call investigation cap includes retrieval as well as model calls; separate media and connection-test requests are outside it. No dollar-per-analysis or free-service guarantee has been measured. CORS defaults to explicit local origins, but CORS is not access control: analysis routes have no user authentication or application rate limiting. Do not expose a paid-key-backed instance publicly without access controls, abuse limits, and an appropriate data policy.
 
 ## Verification
 
+From the repository root in a Python 3.12 environment with Node 22:
+
 ```bash
-python -c "from app import app; print(app.title)"
+python -m pip install -r requirements.txt
+npm --prefix webapp ci
+npm --prefix webapp test
 npm --prefix webapp run build -- --outDir ../public --emptyOutDir
-python -m unittest discover -s backend/tests -p test_api.py
-python -m unittest discover -s backend/tests -p test_media.py
-python -m unittest discover -s backend/tests -p test_settings.py
-npm --prefix webapp run build
+python -m unittest discover -s backend/tests -p "test_*.py"
+python backend/tests/benchmark_investigation.py --check
 ```
 
-The regression suite exercises health, text and RAG responses, all media upload endpoints, frontend routing, and local settings/connection guards. Media tests inspect real decodable image/audio payloads and bounded timestamped video frames, schema validation, provider failure states, null confidence fields, off-event-loop SDK execution, and the real installed SDK's request serialization with its transport mocked. Gemini and web retrieval are mocked so tests require no credentials or network. The `public` build above is required for the API suite's Vercel routing tests; the final normal build also updates locally served `webapp/dist`. A live connection/media check with an authorized key and a deployed Vercel smoke test are still needed to verify account/model access and platform limits.
+These are the steps in [CI](.github/workflows/ci.yml), including the benchmark `--check` gate. Build `public` before backend discovery because API routing tests require that artifact. All `test_*.py` suites are discovered, including investigation, SDK serialization, audio regression, and streaming tests. The local suite passed 75 backend tests. Do not use Python `-O`, which disables harness assertions. For machine-readable benchmark output, run `python backend/tests/benchmark_investigation.py --json --check`.
+
+For local production-style serving, additionally build the local static directory:
+
+```bash
+npm --prefix webapp run build
+python -m uvicorn app:app --port 8000 --workers 1
+```
+
+The backend suite exercises health, text/RAG, media uploads, frontend routing, settings/connection guards, investigation validation/bounds, JSON/stream parity, live trace emission, cancellation, and sanitized errors. Media tests inspect decodable image/audio payloads, bounded timestamped video frames, schema validation, failure states, null confidence fields, off-event-loop SDK work, and installed-SDK serialization with transport mocked. Frontend Node tests exercise stream parsing, chunk boundaries, malformed/incomplete records, and cancellation; they are not a browser end-to-end or visual/mobile audit. Gemini and retrieval are mocked for offline tests; dependency installation itself needs package-registry access. Passing tests does not verify account/model access, live retrieval quality, injection resistance, deployment streaming, or platform limits.
+
+A separate [browser smoke test](webapp/tests/browser-smoke.mjs) passed in real headless Chromium at 1440x1000 and 390x844: live events before completion, evidence reports, cancellation, all input modes, settings, and no horizontal overflow or browser errors. It uses synthetic HTTP responses, not live analysis. To rerun, install Playwright outside the application, set `PLAYWRIGHT_MODULE` to its `index.mjs` path and `PLAYWRIGHT_BROWSERS_PATH` to its Chromium cache, then run `node webapp/tests/browser-smoke.mjs`. The script starts and stops its own Vite and mock servers. Mobile coverage is emulated Chromium, not a physical device.
+
+The review also fixed a reproducible Windows native crash in librosa's pitch interpolation path, retaining STFT-based pitch checks and the original sampled audio payload. Frontend dependency audit reports zero known vulnerabilities after the Vite 6.4.3 update. Docker was not built locally because its daemon was unavailable; live account/model access and deployed streaming still require a pre-demo smoke check.

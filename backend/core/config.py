@@ -23,11 +23,9 @@ class Settings:
     PORT: int = int(os.environ.get("PORT", 8000))
     
     # CORS origins
-    CORS_ORIGINS: list = [
-        "http://localhost:5173",   # Vite dev server
-        "http://localhost:3000",
-        "*"
-    ]
+    CORS_ORIGINS: list = [origin.strip() for origin in os.environ.get(
+        "CORS_ORIGINS", "http://localhost:5173,http://127.0.0.1:5173"
+    ).split(",") if origin.strip()]
     
     # File upload limits
     MAX_UPLOAD_SIZE_MB: int = 100

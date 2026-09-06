@@ -62,13 +62,13 @@ class SettingsTests(unittest.TestCase):
             self.addCleanup(blocked.assert_not_called)
         self.wikipedia = self.enterContext(patch.object(
             rag_module.rag_verifier, "_query_wikipedia",
-            return_value="<b>Regular exercise</b> improves cardiovascular health.",
+            return_value=[{"title": "Exercise", "url": "https://en.wikipedia.org/wiki/Exercise",
+                           "excerpt": self.text}],
         ))
         self.duckduckgo = self.enterContext(patch.object(
             rag_module.rag_verifier, "_query_duckduckgo",
             side_effect=AssertionError("Unexpected search fallback"),
         ))
-        self.addCleanup(self.duckduckgo.assert_not_called)
 
     def assert_settings(self, response, configured, model):
         self.assertEqual(response.status_code, 200, response.text)
@@ -92,44 +92,70 @@ class SettingsTests(unittest.TestCase):
             self.assert_settings(self.client.get(self.endpoint), True, settings.GEMINI_MODEL)
         self.constructor.assert_not_called()
 
-    def test_put_updates_actual_text_analyzer_client_and_model(self):
+    def test_configured_text_route_uses_only_local_checks_without_claims(self):
+        self.configure()
+        with patch.object(text_module.text_analyzer, "analyze",
+                          wraps=text_module.text_analyzer.analyze) as analyze:
+            response = self.client.post("/api/analyze/text", json={
+                "text": self.text, "check_claims": False,
+            })
+        analyze.assert_called_once_with(self.text, check_ai_generated=True,
+                                        check_scam=True, use_llm=False)
+        self.assertEqual(response.status_code, 200, response.text)
+        self.assertIsNone(response.json()["investigation"])
+        self.assertEqual(response.json()["claims_verified"], 0)
+        self.sdk.models.generate_content.assert_not_called()
+        self.wikipedia.assert_not_called()
+        self.duckduckgo.assert_not_called()
+
+    def test_put_updates_live_investigation_client_and_model(self):
         old_sdk = Mock()
         gemini_provider.gemini_client = old_sdk
         self.configure()
         self.constructor.assert_called_once()
         self.assertEqual(self.constructor.call_args.kwargs["api_key"], self.secret)
         self.assertEqual(self.constructor.call_args.kwargs["http_options"].timeout, 30000)
-        self.assertIs(text_module.gemini_provider, gemini_provider)
-        finding = {"category": "AI Generation", "finding": "Updated SDK finding",
-                   "confidence": 0.2, "severity": "low"}
-        self.sdk.models.generate_content.return_value = SimpleNamespace(text=json.dumps({
-            "details": [finding], "scores": {"ai_score": 0.2},
-        }))
-        response = self.client.post("/api/analyze/text", json={
-            "text": self.text, "check_claims": False,
-        })
-        self.assertEqual(response.status_code, 200, response.text)
-        self.assertIn(finding, response.json()["details"])
-        self.sdk.models.generate_content.assert_called_once()
-        self.assertEqual(self.sdk.models.generate_content.call_args.kwargs["model"], self.model)
-        old_sdk.models.generate_content.assert_not_called()
-        self.wikipedia.assert_not_called()
-
-    def test_put_updates_actual_rag_client_and_model(self):
-        self.configure()
         self.assertIs(rag_module.gemini_provider, gemini_provider)
-        self.sdk.models.generate_content.return_value = SimpleNamespace(text=json.dumps({
-            "verdict": "supported", "reasoning": "Offline updated provider evidence",
-        }))
+        query = "exercise cardiovascular research"
+        followup = {"tool": "duckduckgo", "query": "exercise independent clinical evidence"}
+        citation = {"evidence_id": "c1-e1", "quote": self.text, "stance": "supported"}
+        assessment = {"citations": [citation], "reasoning": "Offline updated provider evidence",
+                      "uncertainties": [], "followup": followup}
+        self.sdk.models.generate_content.side_effect = [
+            SimpleNamespace(text=json.dumps(payload)) for payload in [
+                {"claims": [self.text]},
+                {"tool": "wikipedia", "query": query},
+                assessment,
+                {**assessment, "citations": [citation, {**citation, "evidence_id": "c1-e2"}]},
+            ]
+        ]
+        self.duckduckgo.side_effect = None
+        self.duckduckgo.return_value = [{"title": "Exercise research",
+                                        "url": "https://www.reuters.com/science/exercise",
+                                        "excerpt": self.text}]
         response = self.client.post("/api/analyze/text", json={
             "text": self.text, "check_claims": True,
             "check_ai_generated": False, "check_scam": False,
         })
         self.assertEqual(response.status_code, 200, response.text)
         self.assertEqual(response.json()["claims_verified"], 1)
-        self.sdk.models.generate_content.assert_called_once()
-        self.assertEqual(self.sdk.models.generate_content.call_args.kwargs["model"], self.model)
+        claim = response.json()["investigation"]["claims"][0]
+        self.assertEqual(claim["text"], self.text)
+        self.assertEqual(claim["verdict"], "supported")
+        self.assertEqual({e["publisher"] for e in claim["evidence"]}, {"Wikipedia", "Reuters"})
+        calls = self.sdk.models.generate_content.call_args_list
+        self.assertEqual(len(calls), 4)
+        for call, schema in zip(calls, [rag_module._Claims, rag_module._Plan,
+                                       rag_module._Assessment, rag_module._Assessment]):
+            self.assertEqual(call.kwargs["model"], self.model)
+            self.assertEqual(call.kwargs["config"].response_mime_type, "application/json")
+            self.assertEqual(call.kwargs["config"].response_schema["title"], schema.__name__)
+            self.assertIn(self.text, call.kwargs["contents"])
+        old_sdk.models.generate_content.assert_not_called()
         self.wikipedia.assert_called_once()
+        self.assertEqual(self.wikipedia.call_args.args[0], query)
+        self.duckduckgo.assert_called_once()
+        self.assertEqual(self.duckduckgo.call_args.args[0], followup["query"])
 
     def test_blank_or_omitted_key_preserves_configured_secret(self):
         self.configure()
